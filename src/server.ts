@@ -65,7 +65,8 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
 
   const siteContext = (c: Context<Env>): SiteContext => ({
     site: settings.site(),
-    nav: pages.nav(),
+    nav: pages.nav(settings.site()),
+    legal: pages.legal(settings.site()),
     origin: publicUrl ? new URL(publicUrl).origin : new URL(c.req.url).origin,
     images: (src) => media.info(src),
     themeCss: themeCss(settings.theme()),
@@ -196,7 +197,7 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
       ...(posts.length > 0 ? [{ slug: BLOG, title: "Blog", href: `/${BLOG}` }] : []),
       ...posts.map((post) => ({ slug: post.slug, title: post.title, href: pagePath(post) })),
     ];
-    return c.html(renderEditor({ page, site: settings.site(), nav: pages.nav(), pages: targets }, themeCss(settings.theme())));
+    return c.html(renderEditor({ page, site: settings.site(), nav: pages.nav(settings.site()), legal: pages.legal(settings.site()), pages: targets }, themeCss(settings.theme())));
   };
   app.get("/edit", (c) => editor(c, HOME));
   app.get(`/edit/${HOME}`, (c) => c.redirect("/edit"));
@@ -204,7 +205,7 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
 
   const dashboard = (c: Context<Env>, error?: string) =>
     c.html(
-      renderDashboard({ user: c.get("user"), pages: pages.list(), site: settings.site(), origin: siteContext(c).origin, error }),
+      renderDashboard({ user: c.get("user"), pages: pages.list(), site: settings.site(), media: media.list(), origin: siteContext(c).origin, error }),
       error ? 400 : 200,
     );
 
@@ -378,7 +379,14 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
   app.post("/admin/site", async (c) => {
     const form = await c.req.parseBody();
     try {
-      settings.saveSite({ name: form.name, description: form.description ?? "" });
+      settings.saveSite({
+        name: form.name,
+        description: form.description ?? "",
+        logo: form.logo ?? "",
+        footer: form.footer ?? "",
+        imprint: form.imprint ?? "",
+        privacy: form.privacy ?? "",
+      });
       return c.redirect("/admin");
     } catch (err) {
       if (err instanceof ValidationError) return dashboard(c, err.message);

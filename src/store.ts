@@ -10,6 +10,7 @@ import {
   type RevisionSummary,
   type SiteSettings,
   ValidationError,
+  isSafeImageSrc,
   parseBlocks,
 } from "./blocks";
 import { type ThemeSettings, defaultTheme, parseTheme } from "./theme/tokens";
@@ -89,14 +90,24 @@ export class PageStore {
     return [...this.list(), ...this.posts({ drafts: true })];
   }
 
-  nav(): NavItem[] {
+  // The main menu. Legal pages chosen for the footer are left out, they already appear there.
+  nav(site?: Pick<SiteSettings, "imprint" | "privacy">): NavItem[] {
+    const legal = [site?.imprint, site?.privacy];
     const items: NavItem[] = this.list()
-      .filter((page) => page.slug !== HOME && page.inNav)
+      .filter((page) => page.slug !== HOME && page.inNav && !legal.includes(page.slug))
       .map(({ slug, title }) => ({ slug, title }));
     // The blog shows up in the menu as soon as there is something to read.
     const hasPosts = this.db.query("SELECT 1 FROM pages WHERE kind = 'post' AND published_at IS NOT NULL LIMIT 1").get();
     if (hasPosts) items.push({ slug: BLOG, title: "Blog", href: `/${BLOG}` });
     return items;
+  }
+
+  // Links for the footer: legal notice and privacy policy, if those pages still exist.
+  legal(site: SiteSettings): NavItem[] {
+    return [
+      { slug: site.imprint, title: "Impressum" },
+      { slug: site.privacy, title: "Datenschutz" },
+    ].filter((item) => item.slug !== "" && this.get(item.slug)?.kind === "page");
   }
 
   // Creates a page or post from a title and returns it. The address is derived from the title.
@@ -228,10 +239,25 @@ export class SettingsStore {
     return theme;
   }
 
-  saveSite(input: { name: unknown; description: unknown }): SiteSettings {
-    const site = {
+  saveSite(input: Partial<Record<keyof SiteSettings, unknown>>): SiteSettings {
+    const current = this.site();
+    const page = (value: unknown, field: string) => {
+      const slug = value === undefined ? "" : String(value);
+      if (slug !== "" && !this.db.query("SELECT 1 FROM pages WHERE slug = ? AND kind = 'page'").get(slug)) {
+        throw new ValidationError(`Die Seite für ${field} gibt es nicht`);
+      }
+      return slug;
+    };
+    const logo = input.logo === undefined ? current.logo : String(input.logo).trim();
+    if (logo !== "" && !isSafeImageSrc(logo)) throw new ValidationError("Das Logo muss ein Bild aus der Mediathek sein");
+    const site: SiteSettings = {
       name: text(input.name, "Name", 1, 100),
-      description: text(input.description, "Beschreibung", 0, 300),
+      description: text(input.description ?? "", "Beschreibung", 0, 300),
+      logo,
+      // Line breaks matter in the footer (e.g. an address), so it is not squeezed like the fields above.
+      footer: input.footer === undefined ? current.footer : footerText(input.footer),
+      imprint: input.imprint === undefined ? current.imprint : page(input.imprint, "das Impressum"),
+      privacy: input.privacy === undefined ? current.privacy : page(input.privacy, "den Datenschutz"),
     };
     this.set("site", site);
     return site;
@@ -299,7 +325,14 @@ function toPage(row: PageRow): Page {
   };
 }
 
-const defaultSite: SiteSettings = { name: "Meine Website", description: "" };
+const defaultSite: SiteSettings = { name: "Meine Website", description: "", logo: "", footer: "", imprint: "", privacy: "" };
+
+function footerText(value: unknown): string {
+  if (typeof value !== "string") throw new ValidationError("Die Fußzeile muss Text sein");
+  const clean = value.replace(/\r\n?/g, "\n").trim();
+  if (clean.length > 2_000) throw new ValidationError("Die Fußzeile darf höchstens 2000 Zeichen lang sein");
+  return clean;
+}
 
 const homePage: { title: string; blocks: Block[] } = {
   title: "Willkommen bei Theta",

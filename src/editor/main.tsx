@@ -30,7 +30,7 @@ const saveLabels: Record<SaveState, string> = {
   error: "Speichern fehlgeschlagen",
 };
 
-function Editor({ page, site, nav, pages }: EditorData) {
+function Editor({ page, site, nav, legal, pages }: EditorData) {
   const [blocks, setBlocks] = useState(page.blocks);
   const post = page.kind === "post";
   const [meta, setMeta] = useState<PageMeta>({
@@ -164,7 +164,7 @@ function Editor({ page, site, nav, pages }: EditorData) {
       {panel === "history" && <HistoryPanel slug={page.slug} onLoad={loadRevision} />}
       {notice && <p className="theta-notice">{notice}</p>}
 
-      <SiteFrame site={site} nav={nav} current={post ? BLOG : page.slug} linkTo={editPath}>
+      <SiteFrame site={site} nav={nav} legal={legal} current={post ? BLOG : page.slug} linkTo={editPath}>
         {post && (
           <p className="t-post-meta">
             {meta.published ? formatDate(publishedAt ?? new Date().toISOString()) : "Entwurf, noch nicht veröffentlicht"}

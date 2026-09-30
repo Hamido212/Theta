@@ -18,7 +18,8 @@ export async function exportSite({ pages, settings, media }: Stores, origin: str
   const posts = pages.posts();
   const context: SiteContext = {
     site: settings.site(),
-    nav: pages.nav(),
+    nav: pages.nav(settings.site()),
+    legal: pages.legal(settings.site()),
     origin,
     images: (src) => media.info(src),
     themeCss: themeCss(settings.theme()),
