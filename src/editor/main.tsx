@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type DragEvent, useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   BLOG,
@@ -45,6 +45,15 @@ function Editor({ page, site, nav, legal, pages }: EditorData) {
   const [notice, setNotice] = useState("");
   const [state, setState] = useState<SaveState>("saved");
   const [error, setError] = useState("");
+  // The block whose settings are open; only one at a time keeps the page readable.
+  const [selected, setSelected] = useState<string | null>(null);
+  // Where the "add block" menu is open: the index a new block will get.
+  const [adding, setAdding] = useState<number | null>(null);
+  // The block a failed save complained about.
+  const [errorBlock, setErrorBlock] = useState<string | null>(null);
+  // Drag and drop: the block being dragged and where it would land.
+  const dragging = useRef<number | null>(null);
+  const [dropAt, setDropAt] = useState<number | null>(null);
   // Counts edits, so a save that finishes after further typing does not report "saved".
   const version = useRef(0);
 
@@ -75,7 +84,30 @@ function Editor({ page, site, nav, legal, pages }: EditorData) {
       return copy;
     });
 
+  // Moves the block at index `from` so that it lands before the block now at index `to`.
+  // Dropping on the upper half of a block puts the dragged one before it, otherwise after it.
+  const dropIndex = (event: DragEvent<HTMLElement>, index: number) => {
+    const box = event.currentTarget.getBoundingClientRect();
+    return event.clientY < box.top + box.height / 2 ? index : index + 1;
+  };
+
+  const moveTo = (from: number, to: number) =>
+    change((list) => {
+      if (to === from || to === from + 1) return list;
+      const copy = [...list];
+      const [block] = copy.splice(from, 1);
+      copy.splice(to > from ? to - 1 : to, 0, block!);
+      return copy;
+    });
+
   const remove = (id: string) => change((list) => list.filter((b) => b.id !== id));
+
+  const duplicate = (index: number) =>
+    change((list) => {
+      const copy = structuredClone(list[index]!);
+      copy.id = crypto.randomUUID();
+      return [...list.slice(0, index + 1), copy, ...list.slice(index + 1)];
+    });
 
   const loadRevision = (revision: Revision) => {
     setBlocks(revision.blocks);
@@ -87,7 +119,12 @@ function Editor({ page, site, nav, legal, pages }: EditorData) {
   };
 
   const togglePanel = (name: "settings" | "history") => setPanel((open) => (open === name ? null : name));
-  const add = (type: BlockType) => change((list) => [...list, newBlock(type)]);
+  const add = (type: BlockType, at: number) => {
+    const block = newBlock(type);
+    change((list) => [...list.slice(0, at), block, ...list.slice(at)]);
+    setAdding(null);
+    setSelected(block.id);
+  };
 
   const save = useCallback(async () => {
     const saving = version.current;
@@ -98,7 +135,17 @@ function Editor({ page, site, nav, legal, pages }: EditorData) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ...meta, blocks }),
       });
-      if (!res.ok) throw new Error(((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? res.statusText);
+      if (!res.ok) {
+        const problem = (await res.json().catch(() => null)) as { error?: string; block?: number } | null;
+        const bad = problem?.block === undefined ? null : (blocks[problem.block]?.id ?? null);
+        setErrorBlock(bad);
+        if (bad) {
+          setSelected(bad);
+          document.getElementById(`block-${bad}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        throw new Error(problem?.error ?? res.statusText);
+      }
+      setErrorBlock(null);
       setPublishedAt(((await res.json()) as Page).publishedAt);
       setError("");
       setNotice("");
@@ -171,36 +218,121 @@ function Editor({ page, site, nav, legal, pages }: EditorData) {
           </p>
         )}
         <BlockFlow blocks={blocks}>
-          {(block, index) => (
-            <section key={block.id} className="theta-block" aria-label={blockLabels[block.type]}>
-              <div className="theta-controls">
-                <span className="theta-block-label">{blockLabels[block.type]}</span>
-                <BlockOptions block={block} onChange={(patch) => update(block.id, patch)} />
-                <button onClick={() => move(index, -1)} disabled={index === 0} aria-label="Nach oben">
-                  ↑
+          {(block, index) => {
+            const edit = (patch: Partial<Block>) => update(block.id, patch);
+            const classes = [
+              "theta-block",
+              selected === block.id && "theta-selected",
+              errorBlock === block.id && "theta-block-error",
+              dropAt === index && "theta-drop-before",
+              dropAt === index + 1 && index === blocks.length - 1 && "theta-drop-after",
+            ];
+            return (
+              <section
+                key={block.id}
+                id={`block-${block.id}`}
+                className={classes.filter(Boolean).join(" ")}
+                aria-label={blockLabels[block.type]}
+                onFocus={() => setSelected(block.id)}
+                onClick={() => setSelected(block.id)}
+                onDragOver={(event) => {
+                  if (dragging.current === null) return;
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = "move";
+                  setDropAt(dropIndex(event, index));
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  // Read the position from the event itself; the state may not have caught up yet.
+                  if (dragging.current !== null) moveTo(dragging.current, dropIndex(event, index));
+                  dragging.current = null;
+                  setDropAt(null);
+                }}
+              >
+                <div className="theta-controls">
+                  <span
+                    className="theta-handle"
+                    draggable
+                    title="Ziehen zum Verschieben"
+                    onDragStart={(event) => {
+                      dragging.current = index;
+                      event.dataTransfer.effectAllowed = "move";
+                      // Some browsers only start a drag that carries data.
+                      event.dataTransfer.setData("text/plain", block.id);
+                      event.dataTransfer.setDragImage(event.currentTarget.closest("section")!, 20, 20);
+                    }}
+                    onDragEnd={() => {
+                      dragging.current = null;
+                      setDropAt(null);
+                    }}
+                  >
+                    ⠿
+                  </span>
+                  <span className="theta-block-label">{blockLabels[block.type]}</span>
+                  <BlockOptions block={block} onChange={edit} />
+                  <button onClick={() => move(index, -1)} disabled={index === 0} aria-label="Nach oben">
+                    ↑
+                  </button>
+                  <button onClick={() => move(index, 1)} disabled={index === blocks.length - 1} aria-label="Nach unten">
+                    ↓
+                  </button>
+                  <button onClick={() => duplicate(index)} aria-label="Block verdoppeln" title="Verdoppeln">
+                    ⧉
+                  </button>
+                  <button onClick={() => remove(block.id)} aria-label="Block löschen">
+                    ✕
+                  </button>
+                </div>
+                <BlockView block={block} edit={edit} />
+                {selected === block.id && <BlockSettings block={block} onChange={edit} pages={pages} />}
+                <button
+                  className="theta-insert"
+                  aria-label="Hier einen Block einfügen"
+                  title="Hier einen Block einfügen"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setAdding(adding === index + 1 ? null : index + 1);
+                  }}
+                >
+                  +
                 </button>
-                <button onClick={() => move(index, 1)} disabled={index === blocks.length - 1} aria-label="Nach unten">
-                  ↓
-                </button>
-                <button onClick={() => remove(block.id)} aria-label="Block löschen">
-                  ✕
-                </button>
-              </div>
-              <BlockView block={block} edit={(patch) => update(block.id, patch)} />
-              <BlockSettings block={block} onChange={(patch) => update(block.id, patch)} pages={pages} />
-            </section>
-          )}
+                {adding === index + 1 && <AddMenu onAdd={(type) => add(type, index + 1)} onClose={() => setAdding(null)} />}
+              </section>
+            );
+          }}
         </BlockFlow>
 
         <div className="theta-add">
-          {(Object.keys(blockLabels) as BlockType[]).map((type) => (
-            <button key={type} className="theta-button" onClick={() => add(type)}>
-              + {blockLabels[type]}
-            </button>
-          ))}
+          <AddMenu onAdd={(type) => add(type, blocks.length)} />
         </div>
       </SiteFrame>
     </>
+  );
+}
+
+// The block types in the order people need them most.
+const favourites: BlockType[] = ["heading", "text", "image", "hero", "section", "columns", "button", "gallery", "quote", "video", "divider"];
+const addOrder = [...favourites, ...(Object.keys(blockLabels) as BlockType[]).filter((type) => !favourites.includes(type))];
+
+function AddMenu({ onAdd, onClose }: { onAdd: (type: BlockType) => void; onClose?: () => void }) {
+  return (
+    <div
+      className="theta-add-menu"
+      role="menu"
+      onClick={(event) => event.stopPropagation()}
+      onKeyDown={(event) => event.key === "Escape" && onClose?.()}
+    >
+      {addOrder.map((type) => (
+        <button key={type} className="theta-button" role="menuitem" onClick={() => onAdd(type)}>
+          + {blockLabels[type]}
+        </button>
+      ))}
+      {onClose && (
+        <button className="theta-button" onClick={onClose}>
+          Abbrechen
+        </button>
+      )}
+    </div>
   );
 }
 

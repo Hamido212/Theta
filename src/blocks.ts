@@ -160,7 +160,42 @@ export const emptyHeroButton = (): HeroButton => ({ label: "", href: "" });
 
 export const emptyColumn = (): Column => ({ title: "", text: "", src: "", alt: "", href: "", linkLabel: "" });
 
-export class ValidationError extends Error {}
+export class ValidationError extends Error {
+  // Index of the block the problem is in, so the editor can point at it.
+  constructor(
+    message: string,
+    readonly block?: number,
+  ) {
+    super(message);
+  }
+}
+
+// Field paths in messages ("Block 3.images[1].src") become words people understand
+// ("Block 3 (Galerie), Bild 2: Die Bild-Adresse").
+const FIELD_NAMES: [RegExp, string][] = [
+  [/\.images\[(\d+)\]/g, ", Bild $1"],
+  [/\.items\[(\d+)\]/g, ", Spalte $1"],
+  [/\.buttons\[(\d+)\]/g, ", Button $1"],
+  [/\.(src)\b/g, ": Die Bild-Adresse"],
+  [/\.(href)\b/g, ": Das Link-Ziel"],
+  [/\.(url)\b/g, ": Die Video-Adresse"],
+  [/\.(alt)\b/g, ": Die Bildbeschreibung"],
+  [/\.(caption)\b/g, ": Die Bildunterschrift"],
+  [/\.(title)\b/g, ": Der Titel"],
+  [/\.(text)\b/g, ": Der Text"],
+  [/\.(label|linkLabel)\b/g, ": Die Beschriftung"],
+  [/\.(cite)\b/g, ": Die Quelle"],
+  [/\.(level)\b/g, ": Die Art der Überschrift"],
+];
+
+function friendly(message: string, index: number, type: unknown): string {
+  const label = Object.hasOwn(blockLabels, type as string) ? ` (${blockLabels[type as BlockType]})` : "";
+  let text = message.replace(`Block ${index + 1}`, `Block ${index + 1}${label}`);
+  for (const [pattern, words] of FIELD_NAMES) {
+    text = text.replace(pattern, (_, n: string) => (words.includes("$1") ? words.replace("$1", String(Number(n) + 1)) : words));
+  }
+  return text;
+}
 
 const MAX_BLOCKS = 500;
 const MAX_TEXT = 20_000;
@@ -175,6 +210,15 @@ export function parseBlocks(input: unknown): Block[] {
   // Headings saved before levels existed: the first one was the page title, the rest become section headings.
   let hasTitle = false;
   return input.map((raw, index): Block => {
+    try {
+      return parseBlock(raw, index);
+    } catch (err) {
+      if (!(err instanceof ValidationError)) throw err;
+      throw new ValidationError(friendly(err.message, index, (raw as { type?: unknown } | null)?.type), index);
+    }
+  });
+
+  function parseBlock(raw: unknown, index: number): Block {
     const where = `Block ${index + 1}`;
     if (typeof raw !== "object" || raw === null) throw new ValidationError(`${where}: kein Objekt`);
     const value = raw as Record<string, unknown>;
@@ -259,7 +303,7 @@ export function parseBlocks(input: unknown): Block[] {
       default:
         throw new ValidationError(`${where}: unbekannter Typ ${JSON.stringify(value.type)}`);
     }
-  });
+  }
 }
 
 export function isSafeImageSrc(src: string): boolean {
