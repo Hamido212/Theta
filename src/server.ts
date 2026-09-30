@@ -23,6 +23,7 @@ import {
 import { PageStore, SettingsStore, parseDescription, parseTitle, slugify } from "./store";
 import { zip } from "./zip";
 import { type PresetId, PRESETS, defaultTheme, themeCss } from "./theme/tokens";
+import { isPageTemplate } from "./templates";
 
 const SESSION_COOKIE = "theta_session";
 
@@ -214,7 +215,7 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
   app.post("/admin/pages", async (c) => {
     const form = await c.req.parseBody();
     try {
-      return c.redirect(editPath(pages.create(String(form.title ?? ""), c.get("user").name).slug));
+      return c.redirect(editPath(pages.create(String(form.title ?? ""), c.get("user").name, "page", isPageTemplate(form.template) ? form.template : "blank").slug));
     } catch (err) {
       if (err instanceof ValidationError) return dashboard(c, err.message);
       throw err;

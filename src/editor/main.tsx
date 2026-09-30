@@ -16,6 +16,7 @@ import {
 import type { EditorData } from "../render";
 import { BlockFlow, BlockView } from "../theme/blocks";
 import { SiteFrame } from "../theme/layout";
+import { type SectionTemplate, insertTemplate, sectionTemplates } from "../templates";
 import { FormatBar } from "./format";
 import { HistoryPanel } from "./history";
 import { BlockOptions, BlockSettings } from "./settings";
@@ -124,6 +125,13 @@ function Editor({ page, site, nav, legal, pages }: EditorData) {
     change((list) => [...list.slice(0, at), block, ...list.slice(at)]);
     setAdding(null);
     setSelected(block.id);
+  };
+
+  const addTemplate = (template: SectionTemplate, at: number) => {
+    const inserted = template.blocks();
+    change((list) => insertTemplate(list, at, inserted));
+    setAdding(null);
+    setSelected(inserted.find((block) => block.type === "heading")?.id ?? inserted[0]!.id);
   };
 
   const save = useCallback(async () => {
@@ -296,14 +304,18 @@ function Editor({ page, site, nav, legal, pages }: EditorData) {
                 >
                   +
                 </button>
-                {adding === index + 1 && <AddMenu onAdd={(type) => add(type, index + 1)} onClose={() => setAdding(null)} />}
+                {adding === index + 1 && <AddMenu
+                    onAdd={(type) => add(type, index + 1)}
+                    onTemplate={(template) => addTemplate(template, index + 1)}
+                    onClose={() => setAdding(null)}
+                  />}
               </section>
             );
           }}
         </BlockFlow>
 
         <div className="theta-add">
-          <AddMenu onAdd={(type) => add(type, blocks.length)} />
+          <AddMenu onAdd={(type) => add(type, blocks.length)} onTemplate={(template) => addTemplate(template, blocks.length)} />
         </div>
       </SiteFrame>
     </>
@@ -314,7 +326,9 @@ function Editor({ page, site, nav, legal, pages }: EditorData) {
 const favourites: BlockType[] = ["heading", "text", "image", "hero", "section", "columns", "button", "gallery", "quote", "video", "divider"];
 const addOrder = [...favourites, ...(Object.keys(blockLabels) as BlockType[]).filter((type) => !favourites.includes(type))];
 
-function AddMenu({ onAdd, onClose }: { onAdd: (type: BlockType) => void; onClose?: () => void }) {
+type AddMenuProps = { onAdd: (type: BlockType) => void; onTemplate: (template: SectionTemplate) => void; onClose?: () => void };
+
+function AddMenu({ onAdd, onTemplate, onClose }: AddMenuProps) {
   return (
     <div
       className="theta-add-menu"
@@ -322,16 +336,26 @@ function AddMenu({ onAdd, onClose }: { onAdd: (type: BlockType) => void; onClose
       onClick={(event) => event.stopPropagation()}
       onKeyDown={(event) => event.key === "Escape" && onClose?.()}
     >
-      {addOrder.map((type) => (
-        <button key={type} className="theta-button" role="menuitem" onClick={() => onAdd(type)}>
-          + {blockLabels[type]}
-        </button>
-      ))}
-      {onClose && (
-        <button className="theta-button" onClick={onClose}>
-          Abbrechen
-        </button>
-      )}
+      <div className="theta-add-group">
+        {addOrder.map((type) => (
+          <button key={type} className="theta-button" role="menuitem" onClick={() => onAdd(type)}>
+            + {blockLabels[type]}
+          </button>
+        ))}
+        {onClose && (
+          <button className="theta-button" onClick={onClose}>
+            Abbrechen
+          </button>
+        )}
+      </div>
+      <div className="theta-add-group">
+        <span className="theta-add-heading">Fertige Abschnitte</span>
+        {sectionTemplates.map((template) => (
+          <button key={template.id} className="theta-button theta-template" role="menuitem" title={template.hint} onClick={() => onTemplate(template)}>
+            {template.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

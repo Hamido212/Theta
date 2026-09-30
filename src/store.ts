@@ -14,6 +14,7 @@ import {
   parseBlocks,
 } from "./blocks";
 import { type ThemeSettings, defaultTheme, parseTheme } from "./theme/tokens";
+import { type PageTemplateId, pageBlocks } from "./templates";
 
 type PageRow = {
   slug: string;
@@ -111,14 +112,14 @@ export class PageStore {
   }
 
   // Creates a page or post from a title and returns it. The address is derived from the title.
-  create(title: string, author = "", kind: PageKind = "page"): Page {
+  create(title: string, author = "", kind: PageKind = "page", template: PageTemplateId = "blank"): Page {
     const cleanTitle = parseTitle(title);
     const base = slugify(cleanTitle);
     let slug = base;
     for (let n = 2; RESERVED_SLUGS.has(slug) || this.get(slug); n++) slug = `${base}-${n}`;
 
     const { next } = this.db.query<{ next: number }, []>("SELECT COALESCE(MAX(position), 0) + 1 AS next FROM pages").get()!;
-    const blocks: Block[] = [{ id: crypto.randomUUID(), type: "heading", text: cleanTitle, level: 1 }];
+    const blocks = pageBlocks(template, cleanTitle);
     if (kind === "post") blocks.push({ id: crypto.randomUUID(), type: "text", text: "" });
     this.insert(slug, { title: cleanTitle, blocks, kind }, next);
     const page = this.get(slug)!;
