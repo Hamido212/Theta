@@ -11,9 +11,12 @@ export type TextBlock = { id: string; type: "text"; text: string };
 // Wide images break out of the text column, full ones span the whole window.
 export type ImageWidth = "normal" | "wide" | "full";
 export type ImageBlock = { id: string; type: "image"; src: string; alt: string; caption: string; width: ImageWidth };
-export type GalleryBlock = { id: string; type: "gallery"; images: { src: string; alt: string }[] };
+// Galleries show 2 to 4 pictures per row, cropped to squares or in their own proportions.
+export type GalleryBlock = { id: string; type: "gallery"; images: { src: string; alt: string }[]; columns: 2 | 3 | 4; crop: boolean };
 export type ButtonBlock = { id: string; type: "button"; label: string; href: string; variant: "primary" | "secondary" };
-export type ColumnsBlock = { id: string; type: "columns"; items: { title: string; text: string }[] };
+// Columns are plain text side by side, or cards with an optional picture and link.
+export type Column = { title: string; text: string; src: string; alt: string; href: string; linkLabel: string };
+export type ColumnsBlock = { id: string; type: "columns"; style: "plain" | "cards"; items: Column[] };
 export type VideoBlock = { id: string; type: "video"; url: string; title: string };
 export type QuoteBlock = { id: string; type: "quote"; text: string; cite: string };
 export type DividerBlock = { id: string; type: "divider" };
@@ -135,11 +138,11 @@ export function newBlock(type: BlockType, id: string = crypto.randomUUID()): Blo
     case "image":
       return { id, type, src: "", alt: "", caption: "", width: "normal" };
     case "gallery":
-      return { id, type, images: [] };
+      return { id, type, images: [], columns: 3, crop: true };
     case "button":
       return { id, type, label: "", href: "", variant: "primary" };
     case "columns":
-      return { id, type, items: [emptyColumn(), emptyColumn()] };
+      return { id, type, style: "cards", items: [emptyColumn(), emptyColumn(), emptyColumn()] };
     case "video":
       return { id, type, url: "", title: "" };
     case "quote":
@@ -155,7 +158,7 @@ export function newBlock(type: BlockType, id: string = crypto.randomUUID()): Blo
 
 export const emptyHeroButton = (): HeroButton => ({ label: "", href: "" });
 
-export const emptyColumn = () => ({ title: "", text: "" });
+export const emptyColumn = (): Column => ({ title: "", text: "", src: "", alt: "", href: "", linkLabel: "" });
 
 export class ValidationError extends Error {}
 
@@ -199,7 +202,13 @@ export function parseBlocks(input: unknown): Block[] {
         };
       case "gallery": {
         const images = list(value.images, `${where}.images`, MAX_GALLERY_IMAGES);
-        return { id, type: "gallery", images: images.map((item, i) => image(object(item, `${where}.images[${i}]`), `${where}.images[${i}]`)) };
+        return {
+          id,
+          type: "gallery",
+          images: images.map((item, i) => image(object(item, `${where}.images[${i}]`), `${where}.images[${i}]`)),
+          columns: value.columns === 2 || value.columns === 4 ? value.columns : 3,
+          crop: value.crop !== false,
+        };
       }
       case "button": {
         const variant = value.variant === "secondary" ? "secondary" : "primary";
@@ -210,9 +219,18 @@ export function parseBlocks(input: unknown): Block[] {
         return {
           id,
           type: "columns",
+          // Columns saved before cards existed stay plain.
+          style: value.style === "cards" ? "cards" : "plain",
           items: items.map((item, i) => {
-            const column = object(item, `${where}.items[${i}]`);
-            return { title: string(column.title, `${where}.items[${i}].title`, 500), text: string(column.text, `${where}.items[${i}].text`) };
+            const at = `${where}.items[${i}]`;
+            const column = object(item, at);
+            return {
+              title: string(column.title, `${at}.title`, 500),
+              text: string(column.text, `${at}.text`),
+              ...image({ src: column.src ?? "", alt: column.alt ?? "" }, at),
+              href: href(column.href ?? "", `${at}.href`),
+              linkLabel: string(column.linkLabel ?? "", `${at}.linkLabel`, 200),
+            };
           }),
         };
       }

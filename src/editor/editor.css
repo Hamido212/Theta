@@ -382,3 +382,27 @@
 .theta-editable-rich a {
   color: var(--t-color-accent);
 }
+
+.theta-card-settings {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.5rem 0 0;
+  border: 0;
+  border-top: 1px dashed color-mix(in srgb, var(--t-color-muted) 30%, transparent);
+}
+
+.theta-card-settings legend {
+  float: left;
+  padding: 0;
+  color: var(--t-color-muted);
+}
+
+.theta-settings .theta-inline select {
+  font: inherit;
+  padding: 0.35rem 0.5rem;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--t-color-muted) 35%, transparent);
+  background: transparent;
+  color: var(--t-color-text);
+}

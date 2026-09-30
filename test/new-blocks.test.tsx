@@ -72,14 +72,23 @@ describe("rendering", () => {
   });
 
   test("columns, gallery, quote and divider", () => {
-    const columns = render({ id: "c", type: "columns", items: [{ title: "Brot", text: "Frisch" }, { title: "", text: "Kuchen" }] });
+    const column = { src: "", alt: "", href: "", linkLabel: "" };
+    const columns = render({
+      id: "c",
+      type: "columns",
+      style: "plain",
+      items: [
+        { ...column, title: "Brot", text: "Frisch" },
+        { ...column, title: "", text: "Kuchen" },
+      ],
+    });
     expect(columns).toContain('style="--t-columns:2"');
     expect(columns).toContain('<h3 class="t-column-title">Brot</h3>');
     expect(columns.match(/<h3/g)).toHaveLength(1);
 
-    const gallery = render({ id: "g", type: "gallery", images: [{ src: "/a.png", alt: "A" }, { src: "", alt: "" }] });
+    const gallery = render({ id: "g", type: "gallery", images: [{ src: "/a.png", alt: "A" }, { src: "", alt: "" }], columns: 3, crop: true });
     expect(gallery.match(/<img/g)).toHaveLength(1);
-    expect(render({ id: "g", type: "gallery", images: [] })).toBe("");
+    expect(render({ id: "g", type: "gallery", images: [], columns: 3, crop: true })).toBe("");
 
     expect(render({ id: "q", type: "quote", text: "Gutes Brot braucht Zeit.", cite: "Oma" })).toContain("<figcaption>Oma</figcaption>");
     expect(render({ id: "q", type: "quote", text: " ", cite: "" })).toBe("");
@@ -156,5 +165,34 @@ describe("sections and hero", () => {
       { id: "a", type: "heading", text: "Angebot" },
     ]);
     expect(heading).toMatchObject({ level: 2 });
+  });
+});
+
+describe("cards and gallery layout", () => {
+  test("columns saved before cards existed stay plain text columns", () => {
+    const [block] = parseBlocks([{ id: "c", type: "columns", items: [{ title: "Brot", text: "Frisch" }] }]);
+    expect(block).toEqual({
+      id: "c",
+      type: "columns",
+      style: "plain",
+      items: [{ title: "Brot", text: "Frisch", src: "", alt: "", href: "", linkLabel: "" }],
+    });
+  });
+
+  test("cards show picture and link, but only a link with text and target", () => {
+    const card = { title: "Frühstück", text: "Bis 14 Uhr", src: "/a.jpg", alt: "Teller", href: "/speisekarte", linkLabel: "Zur Karte" };
+    const html = render({ id: "c", type: "columns", style: "cards", items: [card, { ...card, linkLabel: " " }] });
+    expect(html).toContain('class="t-columns t-columns-cards"');
+    expect(html.match(/<img/g)).toHaveLength(2);
+    expect(html.match(/t-column-link/g)).toHaveLength(1);
+    expect(html).toContain('<a class="t-column-link" href="/speisekarte">Zur Karte</a>');
+    expect(() => parseBlocks([{ id: "c", type: "columns", style: "cards", items: [{ ...card, href: "javascript:alert(1)" }] }])).toThrow(ValidationError);
+  });
+
+  test("galleries choose columns and cropping", () => {
+    const [block] = parseBlocks([{ id: "g", type: "gallery", images: [{ src: "/a.jpg", alt: "" }], columns: 7, crop: false }]);
+    expect(block).toMatchObject({ columns: 3, crop: false });
+    const html = render({ id: "g", type: "gallery", images: [{ src: "/a.jpg", alt: "" }], columns: 2, crop: true });
+    expect(html).toContain('class="t-gallery t-gallery-crop" style="--t-gallery-columns:2"');
   });
 });

@@ -282,6 +282,9 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
         if (!titles.includes(page.title)) usage.set(id!, [...titles, page.title]);
       }
     }
+    // The logo is used on every page.
+    const logo = settings.site().logo.match(/^\/media\/([\w-]+)\//)?.[1];
+    if (logo) usage.set(logo, [...(usage.get(logo) ?? []), "Logo"]);
     return usage;
   };
 

@@ -75,10 +75,10 @@ function Gallery({ block, edit }: BlockProps<GalleryBlock>) {
   const images = block.images.filter((image) => image.src);
   if (images.length === 0) return edit ? <Empty>Noch keine Bilder in der Galerie</Empty> : null;
   return (
-    <ul className="t-gallery">
+    <ul className={block.crop ? "t-gallery t-gallery-crop" : "t-gallery"} style={{ "--t-gallery-columns": block.columns } as CSSProperties}>
       {images.map((image, i) => (
         <li key={i}>
-          <Img src={image.src} alt={image.alt} sizes="(min-width: 44rem) 14rem, 45vw" />
+          <Img src={image.src} alt={image.alt} sizes={`(min-width: 44rem) ${Math.ceil(42 / block.columns)}rem, ${Math.ceil(100 / Math.min(block.columns, 2))}vw`} />
         </li>
       ))}
     </ul>
@@ -112,9 +112,10 @@ function Columns({ block, edit }: BlockProps<ColumnsBlock>) {
   const change = (index: number, patch: Partial<ColumnsBlock["items"][number]>) =>
     edit?.({ items: block.items.map((item, i) => (i === index ? { ...item, ...patch } : item)) });
   return (
-    <div className="t-columns" style={{ "--t-columns": block.items.length } as CSSProperties}>
+    <div className={`t-columns t-columns-${block.style}`} style={{ "--t-columns": block.items.length } as CSSProperties}>
       {block.items.map((item, i) => (
         <div key={i} className="t-column">
+          {block.style === "cards" && item.src && <Img src={item.src} alt={item.alt} sizes="(min-width: 44rem) 20rem, 100vw" />}
           {(edit || item.title) && (
             <h3 className="t-column-title">
               <TextField value={item.title} onChange={edit && ((title) => change(i, { title }))} placeholder="Titel" />
@@ -123,6 +124,17 @@ function Columns({ block, edit }: BlockProps<ColumnsBlock>) {
           <div className="t-text">
             <TextField value={item.text} onChange={edit && ((text) => change(i, { text }))} rich placeholder="Text" />
           </div>
+          {item.href &&
+            (edit || item.linkLabel.trim()) &&
+            (edit ? (
+              <span className="t-column-link">
+                <TextField value={item.linkLabel} onChange={(linkLabel) => change(i, { linkLabel })} placeholder="Linktext, z. B. Mehr erfahren" />
+              </span>
+            ) : (
+              <a className="t-column-link" href={item.href}>
+                {item.linkLabel}
+              </a>
+            ))}
         </div>
       ))}
     </div>
