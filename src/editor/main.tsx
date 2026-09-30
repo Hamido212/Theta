@@ -18,7 +18,7 @@ import { BlockFlow, BlockView } from "../theme/blocks";
 import { SiteFrame } from "../theme/layout";
 import { type SavedSectionTemplate, type SectionTemplate, insertTemplate, sectionTemplates } from "../templates";
 import { blockRange, copyBlocks, duplicateBlocks, moveBlocks, removeBlocks, stepBlocks } from "./sections";
-import { DraftWriter, draftKey, SaveError, type SaveAction } from "./draft-writer";
+import { DraftWriter, draftKey, SaveError, type Draft, type SaveAction } from "./draft-writer";
 import { FormatBar } from "./format";
 import { HistoryPanel } from "./history";
 import { BlockOptions, BlockSettings } from "./settings";
@@ -50,12 +50,15 @@ function Editor({ page, site, nav, legal, pages, templates = [] }: EditorData) {
   const [side, setSide] = useState<"pages" | "inspector" | null>(null);
   const [conflict, setConflict] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const restorePending = useRef(false);
   const writer = useRef<DraftWriter | null>(null);
   if (!writer.current) writer.current = new DraftWriter(page);
   const latest = useRef({ ...meta, blocks });
   latest.current = { ...meta, blocks };
   const [panel, setPanel] = useState<"settings" | "history" | null>(null);
   const [notice, setNotice] = useState("");
+  const [blockedPreview, setBlockedPreview] = useState(false);
   const [state, setState] = useState<SaveState>("saved");
   const [error, setError] = useState("");
   // The block whose settings are open; only one at a time keeps the page readable.
@@ -70,6 +73,7 @@ function Editor({ page, site, nav, legal, pages, templates = [] }: EditorData) {
   const discarding = useRef(false);
   const touch = () => {
     setNotice("");
+    setBlockedPreview(false);
     setState("dirty");
   };
 
@@ -102,15 +106,6 @@ function Editor({ page, site, nav, legal, pages, templates = [] }: EditorData) {
   };
   const duplicate = (index: number) => change((list) => duplicateBlocks(list, index));
 
-  const loadRevision = (revision: Revision) => {
-    setBlocks(revision.blocks);
-    setMeta((current) => ({ ...current, title: revision.title, description: revision.description, inNav: revision.inNav }));
-    touch();
-    setPanel(null);
-    const when = new Date(revision.createdAt).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" });
-    setNotice(`Version vom ${when} als Entwurf geladen. Veröffentlichen, um sie live zu übernehmen.`);
-  };
-
   const togglePanel = (name: "settings" | "history") => setPanel((open) => (open === name ? null : name));
   const add = (type: BlockType, at: number) => {
     const block = newBlock(type);
@@ -126,11 +121,24 @@ function Editor({ page, site, nav, legal, pages, templates = [] }: EditorData) {
     setSelected(inserted.find((block) => block.type === "heading")?.id ?? inserted[0]!.id);
   };
 
-  const save = useCallback(async (action: SaveAction = "save", autosave = false) => {
+  const save = useCallback(async (action: SaveAction = "save", autosave = false, restoration?: Draft) => {
+    if (restorePending.current) return false;
+    if (restoration) { restorePending.current = true; setRestoring(true); }
+    setBlockedPreview(false);
     setState("saving");
     if (action !== "save") setPublishing(true);
     try {
-      const result = await writer.current!.save(() => latest.current, action, autosave);
+      const result = restoration
+        ? await writer.current!.restore(() => latest.current, restoration)
+        : await writer.current!.save(() => latest.current, action, autosave);
+      if (restoration) {
+        const restored = { title: result.title, description: result.description, inNav: result.inNav, blocks: result.blocks };
+        latest.current = restored;
+        setMeta({ title: restored.title, description: restored.description, inNav: restored.inNav });
+        setBlocks(restored.blocks);
+        setSelected(null);
+        setAdding(null);
+      }
       setSavedPage(result);
       setErrorBlock(null);
       setError("");
@@ -138,6 +146,7 @@ function Editor({ page, site, nav, legal, pages, templates = [] }: EditorData) {
       setState(draftKey(latest.current) === writer.current!.savedKey ? "saved" : "dirty");
       return true;
     } catch (err) {
+      setSavedPage(writer.current!.page);
       if (err instanceof SaveError) {
         setConflict(err.conflict);
         const bad = err.block === undefined ? null : latest.current.blocks[err.block]?.id ?? null;
@@ -150,20 +159,36 @@ function Editor({ page, site, nav, legal, pages, templates = [] }: EditorData) {
       setError(err instanceof Error ? err.message : String(err));
       setState("error");
       return false;
-    } finally { if (action !== "save") setPublishing(false); }
+    } finally {
+      if (action !== "save") setPublishing(false);
+      if (restoration) { restorePending.current = false; setRestoring(false); }
+    }
   }, []);
 
+  const loadRevision = async (revision: Revision) => {
+    const restored = { title: revision.title, description: revision.description, inNav: revision.inNav, blocks: revision.blocks };
+    if (await save("save", false, restored)) {
+      setPanel(null);
+      const when = new Date(revision.createdAt).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" });
+      setNotice(`Version vom ${when} als Entwurf wiederhergestellt. Der vorherige Stand bleibt im Verlauf. Veröffentlichen, um sie live zu übernehmen.`);
+    }
+  };
+
   useEffect(() => {
-    if (state !== "dirty" || conflict || publishing) return;
+    if (state !== "dirty" || conflict || publishing || restoring) return;
     const timer = window.setTimeout(() => { void save("save", true); }, 1000);
     return () => window.clearTimeout(timer);
-  }, [blocks, meta, state, conflict, publishing, save]);
+  }, [blocks, meta, state, conflict, publishing, restoring, save]);
 
   const preview = async () => {
     const win = window.open("about:blank", "_blank");
     if (win) win.opener = null;
     if (await save()) {
       if (win) win.location.href = `/admin/preview/${encodeURIComponent(page.slug)}`;
+      else {
+        setBlockedPreview(true);
+        setNotice("Das Vorschaufenster wurde blockiert. Öffne den Vorschau-Link unter dieser Meldung.");
+      }
     } else win?.close();
   };
 
@@ -201,7 +226,7 @@ function Editor({ page, site, nav, legal, pages, templates = [] }: EditorData) {
       }
     };
     const onLeave = (event: BeforeUnloadEvent) => {
-      if (state !== "saved" && !discarding.current) event.preventDefault();
+      if ((state !== "saved" || restorePending.current) && !discarding.current) event.preventDefault();
     };
     window.addEventListener("keydown", onKey);
     window.addEventListener("beforeunload", onLeave);
@@ -236,8 +261,8 @@ function Editor({ page, site, nav, legal, pages, templates = [] }: EditorData) {
         <button className="theta-button" onClick={() => void save()} disabled={state === "saving" || state === "saved" || conflict}>
           Speichern
         </button>
-        <button className="theta-button" onClick={() => void preview()} disabled={conflict || publishing}>Vorschau</button>
-        <button className="theta-button theta-primary" onClick={() => void save("publish")} disabled={publishing || conflict || (state === "saved" && !savedPage.hasChanges)}>Veröffentlichen</button>
+        <button className="theta-button" onClick={() => void preview()} disabled={conflict || publishing || restoring}>Vorschau</button>
+        <button className="theta-button theta-primary" onClick={() => void save("publish")} disabled={publishing || restoring || conflict || (state === "saved" && !savedPage.hasChanges)}>Veröffentlichen</button>
         <form method="post" action="/logout">
           <button className="theta-button" type="submit">
             Abmelden
@@ -245,16 +270,16 @@ function Editor({ page, site, nav, legal, pages, templates = [] }: EditorData) {
         </form>
       </header>
 
-      <div className="theta-workbench">
+      <div className="theta-workbench" inert={restoring}>
         <aside className={`theta-sidebar theta-navigation ${side === "pages" ? "theta-side-open" : ""}`} aria-label="Seiten und Abschnitte">
           <h2>Deine Website</h2>
-          <nav>{pages.filter((p) => p.slug !== BLOG).map((p) => <a key={p.slug} href={editPath(p.slug)} aria-current={p.slug === page.slug ? "page" : undefined}>{p.title}</a>)}</nav>
+          <nav>{pages.filter((p) => p.slug !== BLOG).map((p) => <a key={p.slug} href={editPath(p.slug)} aria-current={p.slug === page.slug ? "page" : undefined}>{p.slug === page.slug ? meta.title : p.title}</a>)}</nav>
           <div className="theta-nav-links"><a href="/admin">Seiten verwalten</a><a href="/admin/media">Mediathek</a><a href="/admin/design">Design</a><a href="/admin/trash">Papierkorb</a></div>
           <h2>Auf dieser Seite</h2>
           <nav aria-label="Seitenaufbau">{blocks.map((block, index) => (block.type === "section" || block.type === "hero" || index === 0) && <button key={block.id} className={selected === block.id ? "theta-nav-selected" : ""} onClick={() => { setSelected(block.id); setPanel(null); setSide(null); document.getElementById(`block-${block.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }); }}>{block.type === "hero" ? block.title || "Titelbild" : block.type === "section" ? `Abschnitt ${blocks.slice(0, index + 1).filter((b) => b.type === "section").length}` : "Seitenanfang"}</button>)}</nav>
         </aside>
         <div className="theta-canvas">
-          {notice && <p className="theta-notice" role="status">{notice}</p>}
+          {notice && <p className="theta-notice" role="status">{notice}{blockedPreview && <> <a href={`/admin/preview/${encodeURIComponent(page.slug)}`} target="_blank" rel="noopener">Gespeicherten Entwurf ansehen</a></>}</p>}
           {error && <div className="theta-error-banner" role="alert"><p>{error}</p>{conflict ? <button className="theta-button" onClick={() => { discarding.current = true; window.location.reload(); }}>Eigene Änderungen verwerfen und Serverstand laden</button> : <button className="theta-button" onClick={() => void save()}>Erneut speichern</button>}</div>}
           <div className="theta-format-dock"><FormatBar /><span>Text direkt auf der Seite bearbeiten</span></div>
       <SiteFrame site={site} nav={nav} legal={legal} current={post ? BLOG : page.slug} linkTo={editPath}>

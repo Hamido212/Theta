@@ -64,6 +64,104 @@ test("a failed network save can be retried with the same version", async () => {
   expect((await writer.save(() => ({ ...page, title: "Neu" }))).version).toBe(2);
 });
 
+test("restoring history preserves autosaved and unsaved drafts without changing the live copy", async () => {
+  const { pages, request } = await testSite({ login: true });
+  const created = pages.create("Ursprünglich", "Test");
+  const target = pages.revision(created.slug, pages.revisions(created.slug)[0]!.id)!;
+  pages.save(created.slug, { blocks: [{ id: "live", type: "text", text: "Live-Fassung" }] }, "Test");
+  pages.publish(created.slug, true);
+  const original = pages.get(created.slug)!;
+  const writer = new DraftWriter(original, async (url, init) => request(url, init));
+  let current: Draft = { ...original, title: "Autosave vor Wiederherstellung" };
+  await writer.save(() => current, "save", true);
+  current = { ...current, title: "Noch nicht gesicherte letzte Eingabe" };
+  const restored = { title: target.title, description: target.description, inNav: target.inNav, blocks: target.blocks };
+  const result = await writer.restore(() => current, restored);
+  expect(result).toMatchObject({ title: "Ursprünglich", blocks: target.blocks, hasChanges: true });
+  expect(pages.revisions(created.slug).map((r) => r.title)).toEqual([
+    "Ursprünglich", "Noch nicht gesicherte letzte Eingabe", "Autosave vor Wiederherstellung", "Ursprünglich", "Ursprünglich",
+  ]);
+  expect(pages.live(created.slug)!.blocks).toEqual([{ id: "live", type: "text", text: "Live-Fassung" }]);
+  // Further typing must not replace the restored checkpoint.
+  await writer.save(() => ({ ...restored, title: "Nach Wiederherstellung" }), "save", true);
+  expect(pages.revisions(created.slug)[1]!.title).toBe("Ursprünglich");
+});
+
+test("restoring an already autosaved draft retains that checkpoint", async () => {
+  const { pages, request } = await testSite({ login: true });
+  const created = pages.create("Anfang", "Test");
+  const writer = new DraftWriter(created, async (url, init) => request(url, init));
+  const current: Draft = { ...created, title: "Jüngster Autosave" };
+  await writer.save(() => current, "save", true);
+  await writer.restore(() => current, created);
+  expect(pages.revisions(created.slug).map((r) => r.title)).toEqual(["Anfang", "Jüngster Autosave", "Anfang"]);
+});
+
+test("queued publication cannot run between preserving and restoring a draft", async () => {
+  let finishFirst!: (response: Response) => void;
+  let finishSecond!: (response: Response) => void;
+  let notifySecond!: () => void;
+  const secondStarted = new Promise<void>((resolve) => { notifySecond = resolve; });
+  const calls: Record<string, unknown>[] = [];
+  const target: Draft = { ...page, title: "Historische Fassung" };
+  const request = (_: string, init: RequestInit) => {
+    const body = JSON.parse(String(init.body)); calls.push(body);
+    if (calls.length === 1) return new Promise<Response>((resolve) => { finishFirst = resolve; });
+    if (calls.length === 2) { notifySecond(); return new Promise<Response>((resolve) => { finishSecond = resolve; }); }
+    return Promise.resolve(Response.json({ ...page, ...target, version: 4 }));
+  };
+  const writer = new DraftWriter(page, request);
+  const restoring = writer.restore(() => ({ ...page, title: "Ungesicherter Text" }), target);
+  const publishing = writer.save(() => target, "publish");
+  finishFirst(Response.json({ ...page, title: "Ungesicherter Text", version: 2 }));
+  await secondStarted;
+  expect(calls).toHaveLength(2);
+  expect(calls[1]).toMatchObject({ title: "Historische Fassung", action: "save", autosave: false, version: 2 });
+  finishSecond(Response.json({ ...page, ...target, version: 3 }));
+  await Promise.all([restoring, publishing]);
+  expect(calls[2]).toMatchObject({ action: "publish", version: 3 });
+});
+
+test("failed preservation stops restoration and leaves local content available", async () => {
+  let calls = 0;
+  const writer = new DraftWriter(page, async () => { calls++; return Response.json({ error: "Veralteter Stand" }, { status: 409 }); });
+  const current: Draft = { ...page, title: "Eigene Änderungen" };
+  await expect(writer.restore(() => current, { ...page, title: "Historisch" })).rejects.toThrow("Veralteter Stand");
+  expect(calls).toBe(1);
+  expect(current.title).toBe("Eigene Änderungen");
+  expect(writer.page).toEqual(page);
+});
+
+test("an unconfirmed or malformed success response never marks the local draft as saved", async () => {
+  for (const response of [new Response("<html>Proxy-Fehler</html>"), Response.json({ ok: true }),
+    Response.json({ ...page, slug: "andere-seite" }), Response.json({ ...page, version: 0 }),
+    Response.json({ ...page, kind: "post" }), Response.json({ ...page, blocks: [null] })]) {
+    const writer = new DraftWriter(page, async () => response);
+    const before = writer.savedKey;
+    await expect(writer.save(() => ({ ...page, title: "Ungesicherter Text" }))).rejects.toThrow("nicht bestätigt");
+    expect(writer.page).toEqual(page);
+    expect(writer.savedKey).toBe(before);
+    expect(writer.conflict).toBe(false);
+  }
+});
+
+test("a failed restoration keeps its successful checkpoint and retries with the new version", async () => {
+  const calls: Record<string, unknown>[] = [];
+  const current: Draft = { ...page, title: "Eigene Änderungen" };
+  const target: Draft = { ...page, title: "Historische Fassung" };
+  const writer = new DraftWriter(page, async (_, init) => {
+    const body = JSON.parse(String(init.body)); calls.push(body);
+    if (calls.length === 2) throw new Error("offline");
+    return Response.json({ ...page, ...body, version: calls.length === 1 ? 2 : 3 });
+  });
+  await expect(writer.restore(() => current, target)).rejects.toThrow("offline");
+  expect(writer.page).toMatchObject({ title: current.title, version: 2 });
+  expect(current.title).toBe("Eigene Änderungen");
+  expect((await writer.restore(() => current, target)).title).toBe(target.title);
+  expect(calls).toHaveLength(3);
+  expect(calls[2]).toMatchObject({ title: target.title, version: 2 });
+});
+
 test("section move, duplicate and removal include content and preserve adjacent sections", () => {
   const blocks: Block[] = [
     { id: "intro", type: "text", text: "Intro" },
