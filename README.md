@@ -15,7 +15,7 @@ bun run dev
 
 Danach zeigt http://localhost:3000 die Website. Beim ersten Start gibt Theta im Terminal einen Einrichtungs-Link aus. Darüber legst du dein Konto an und landest direkt im Editor. Später meldest du dich unter http://localhost:3000/admin an. Dort legst du neue Seiten an, ordnest das Menü und gibst deiner Website einen Namen.
 
-Im Editor klickst du auf einen Text und schreibst los. Gespeichert wird mit dem Knopf oder mit Strg+S (⌘+S).
+Im Editor klickst du auf einen Text und schreibst los. Mit den Knöpfen oben (oder Strg+B, Strg+I, Strg+K) wird markierter Text fett, kursiv oder zum Link, und aus Zeilen werden Aufzählungen oder nummerierte Listen. Gespeichert wird dabei kein HTML, sondern ein kleines, sicheres Textformat (`**fett**`, `*kursiv*`, `[Link](/adresse)`, `- Liste`), das auch im Export und in der Datenbank lesbar bleibt. Gespeichert wird mit dem Knopf oder mit Strg+S (⌘+S).
 
 Passwort vergessen? `bun run theta reset-password deine@adresse.de` setzt ein neues, zufälliges Passwort und zeigt es an.
 
@@ -40,6 +40,7 @@ Für moderne Seiten gibt es zwei Bausteine über die volle Fensterbreite. Das **
 | Pfad | Inhalt |
 |---|---|
 | `src/blocks.ts` | Datenmodell der Blöcke und Prüfung aller Eingaben |
+| `src/richtext.ts` | Das Textformat für fett, kursiv, Links und Listen |
 | `src/db.ts` | SQLite-Datenbank und Schema-Migrationen |
 | `src/store.ts` | Speicherung der Seiten, Blog-Beiträge und Einstellungen |
 | `src/auth.ts` | Konten, Passwörter und Anmeldungen |

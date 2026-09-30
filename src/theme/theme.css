@@ -95,6 +95,25 @@ body {
   color: var(--t-color-accent);
 }
 
+.t-text ul,
+.t-text ol {
+  margin: 0 0 1em;
+  padding-left: 1.4em;
+}
+
+.t-text ul:last-child,
+.t-text ol:last-child {
+  margin-bottom: 0;
+}
+
+.t-text li + li {
+  margin-top: 0.25em;
+}
+
+.t-text li::marker {
+  color: var(--t-color-accent);
+}
+
 .t-image {
   margin: 0;
 }

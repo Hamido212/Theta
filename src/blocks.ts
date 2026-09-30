@@ -2,6 +2,8 @@
 // A page is an ordered list of blocks; each block only stores content,
 // never styling. Styling comes from the theme, so editors cannot break the design.
 
+import { plainText } from "./richtext";
+
 // Level 1 is the page title (one per page), 2 a section heading, 3 a smaller subheading.
 export type HeadingLevel = 1 | 2 | 3;
 export type HeadingBlock = { id: string; type: "heading"; text: string; level: HeadingLevel };
@@ -75,7 +77,8 @@ const excerptLength = 220;
 // A short teaser: the description, or else the start of the first text.
 export function excerpt(page: Page): string {
   if (page.description) return page.description;
-  const text = page.blocks.find((block) => block.type === "text")?.text.replace(/\s+/g, " ").trim() ?? "";
+  const first = page.blocks.find((block) => block.type === "text");
+  const text = first ? plainText(first.text).replace(/\s+/g, " ").trim() : "";
   return text.length > excerptLength ? `${text.slice(0, excerptLength).replace(/\s+\S*$/, "")} …` : text;
 }
 

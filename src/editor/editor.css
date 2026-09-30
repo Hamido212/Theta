@@ -354,3 +354,31 @@
 .t-hero .t-button .theta-editable {
   min-width: 6ch;
 }
+
+.theta-format {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.theta-format .theta-button {
+  padding: 0.4rem 0.6rem;
+}
+
+.theta-format .theta-button:first-child {
+  font-weight: 700;
+}
+
+.theta-format .theta-button:nth-child(2) {
+  font-style: italic;
+}
+
+/* Rich text is edited as HTML; give it the same rhythm as the public page. */
+.theta-editable-rich > div:empty,
+.theta-editable-rich ul,
+.theta-editable-rich ol {
+  margin: 0;
+}
+
+.theta-editable-rich a {
+  color: var(--t-color-accent);
+}
