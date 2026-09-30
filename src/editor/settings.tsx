@@ -3,7 +3,10 @@ import {
   type ButtonBlock,
   type ColumnsBlock,
   type GalleryBlock,
+  type HeadingBlock,
+  type HeadingLevel,
   type ImageBlock,
+  type ImageWidth,
   MAX_COLUMNS,
   type NavItem,
   type VideoBlock,
@@ -33,6 +36,37 @@ export function BlockSettings({ block, onChange, pages }: Props<Block>) {
     default:
       return null;
   }
+}
+
+// Small choices shown in the block's toolbar, next to its name.
+export function BlockOptions({ block, onChange }: { block: Block; onChange: (patch: Partial<Block>) => void }) {
+  if (block.type === "heading") {
+    return (
+      <select
+        aria-label="Art der Überschrift"
+        value={block.level}
+        onChange={(e) => onChange({ level: Number(e.target.value) as HeadingLevel } as Partial<HeadingBlock>)}
+      >
+        <option value={1}>Seitentitel</option>
+        <option value={2}>Überschrift</option>
+        <option value={3}>Kleine Überschrift</option>
+      </select>
+    );
+  }
+  if (block.type === "image") {
+    return (
+      <select
+        aria-label="Breite des Bildes"
+        value={block.width}
+        onChange={(e) => onChange({ width: e.target.value as ImageWidth } as Partial<ImageBlock>)}
+      >
+        <option value="normal">Textbreite</option>
+        <option value="wide">Breit</option>
+        <option value="full">Ganze Fensterbreite</option>
+      </select>
+    );
+  }
+  return null;
 }
 
 function AltHint({ src, alt }: { src: string; alt: string }) {

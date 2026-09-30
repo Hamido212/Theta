@@ -2,9 +2,13 @@
 // A page is an ordered list of blocks; each block only stores content,
 // never styling. Styling comes from the theme, so editors cannot break the design.
 
-export type HeadingBlock = { id: string; type: "heading"; text: string };
+// Level 1 is the page title (one per page), 2 a section heading, 3 a smaller subheading.
+export type HeadingLevel = 1 | 2 | 3;
+export type HeadingBlock = { id: string; type: "heading"; text: string; level: HeadingLevel };
 export type TextBlock = { id: string; type: "text"; text: string };
-export type ImageBlock = { id: string; type: "image"; src: string; alt: string };
+// Wide images break out of the text column, full ones span the whole window.
+export type ImageWidth = "normal" | "wide" | "full";
+export type ImageBlock = { id: string; type: "image"; src: string; alt: string; caption: string; width: ImageWidth };
 export type GalleryBlock = { id: string; type: "gallery"; images: { src: string; alt: string }[] };
 export type ButtonBlock = { id: string; type: "button"; label: string; href: string; variant: "primary" | "secondary" };
 export type ColumnsBlock = { id: string; type: "columns"; items: { title: string; text: string }[] };
@@ -96,11 +100,11 @@ export const MAX_GALLERY_IMAGES = 60;
 export function newBlock(type: BlockType, id: string = crypto.randomUUID()): Block {
   switch (type) {
     case "heading":
-      return { id, type, text: "" };
+      return { id, type, text: "", level: 2 };
     case "text":
       return { id, type, text: "" };
     case "image":
-      return { id, type, src: "", alt: "" };
+      return { id, type, src: "", alt: "", caption: "", width: "normal" };
     case "gallery":
       return { id, type, images: [] };
     case "button":
@@ -130,7 +134,9 @@ export function parseBlocks(input: unknown): Block[] {
   if (input.length > MAX_BLOCKS) throw new ValidationError(`Höchstens ${MAX_BLOCKS} Blöcke erlaubt`);
 
   const ids = new Set<string>();
-  return input.map((raw, index) => {
+  // Headings saved before levels existed: the first one was the page title, the rest become section headings.
+  let hasTitle = false;
+  return input.map((raw, index): Block => {
     const where = `Block ${index + 1}`;
     if (typeof raw !== "object" || raw === null) throw new ValidationError(`${where}: kein Objekt`);
     const value = raw as Record<string, unknown>;
@@ -141,12 +147,21 @@ export function parseBlocks(input: unknown): Block[] {
     ids.add(id);
 
     switch (value.type) {
-      case "heading":
-        return { id, type: "heading", text: string(value.text, `${where}.text`) };
+      case "heading": {
+        const level = value.level === undefined ? (hasTitle ? 2 : 1) : headingLevel(value.level, `${where}.level`);
+        hasTitle ||= level === 1;
+        return { id, type: "heading", text: string(value.text, `${where}.text`), level };
+      }
       case "text":
         return { id, type: "text", text: string(value.text, `${where}.text`) };
       case "image":
-        return { id, type: "image", ...image(value, where) };
+        return {
+          id,
+          type: "image",
+          ...image(value, where),
+          caption: value.caption === undefined ? "" : string(value.caption, `${where}.caption`, 500),
+          width: value.width === "wide" || value.width === "full" ? value.width : "normal",
+        };
       case "gallery": {
         const images = list(value.images, `${where}.images`, MAX_GALLERY_IMAGES);
         return { id, type: "gallery", images: images.map((item, i) => image(object(item, `${where}.images[${i}]`), `${where}.images[${i}]`)) };
@@ -201,6 +216,11 @@ function image(value: Record<string, unknown>, where: string) {
     throw new ValidationError(`${where}.src muss mit https://, http:// oder / beginnen`);
   }
   return { src, alt: string(value.alt, `${where}.alt`, 500) };
+}
+
+function headingLevel(value: unknown, field: string): HeadingLevel {
+  if (value === 1 || value === 2 || value === 3) return value;
+  throw new ValidationError(`${field} muss 1, 2 oder 3 sein`);
 }
 
 function object(value: unknown, field: string): Record<string, unknown> {

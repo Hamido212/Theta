@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { type Block, ValidationError, newBlock, parseBlocks } from "../src/blocks";
-import { BlockView } from "../src/theme/blocks";
+import { BlockFlow, BlockView } from "../src/theme/blocks";
 import { videoSource } from "../src/theme/video";
 
 const render = (block: Block) => renderToStaticMarkup(<BlockView block={block} />);
@@ -72,8 +72,8 @@ describe("rendering", () => {
   test("columns, gallery, quote and divider", () => {
     const columns = render({ id: "c", type: "columns", items: [{ title: "Brot", text: "Frisch" }, { title: "", text: "Kuchen" }] });
     expect(columns).toContain('style="--t-columns:2"');
-    expect(columns).toContain('<h2 class="t-column-title">Brot</h2>');
-    expect(columns.match(/<h2/g)).toHaveLength(1);
+    expect(columns).toContain('<h3 class="t-column-title">Brot</h3>');
+    expect(columns.match(/<h3/g)).toHaveLength(1);
 
     const gallery = render({ id: "g", type: "gallery", images: [{ src: "/a.png", alt: "A" }, { src: "", alt: "" }] });
     expect(gallery.match(/<img/g)).toHaveLength(1);
@@ -82,5 +82,28 @@ describe("rendering", () => {
     expect(render({ id: "q", type: "quote", text: "Gutes Brot braucht Zeit.", cite: "Oma" })).toContain("<figcaption>Oma</figcaption>");
     expect(render({ id: "q", type: "quote", text: " ", cite: "" })).toBe("");
     expect(render({ id: "d", type: "divider" })).toBe('<hr class="t-divider"/>');
+  });
+});
+
+describe("layout", () => {
+  test("headings render at their level", () => {
+    expect(render({ id: "h", type: "heading", text: "Getränke", level: 2 })).toBe('<h2 class="t-heading t-heading-2">Getränke</h2>');
+    expect(render({ id: "h", type: "heading", text: "Kaffee", level: 3 })).toBe('<h3 class="t-heading t-heading-3">Kaffee</h3>');
+  });
+
+  test("images show their caption and width", () => {
+    const html = render({ id: "i", type: "image", src: "/a.png", alt: "Laden", caption: "Unser Laden", width: "full" });
+    expect(html).toContain('<figure class="t-image t-width-full">');
+    expect(html).toContain("<figcaption>Unser Laden</figcaption>");
+    expect(render({ id: "i", type: "image", src: "/a.png", alt: "", caption: " ", width: "normal" })).not.toContain("figcaption");
+  });
+
+  test("buttons that follow each other share a row", () => {
+    const button = (id: string): Block => ({ id, type: "button", label: id, href: "/", variant: "primary" });
+    const blocks: Block[] = [button("a"), button("b"), { id: "t", type: "text", text: "Hallo" }, button("c")];
+    const html = renderToStaticMarkup(<BlockFlow blocks={blocks}>{(block) => <BlockView key={block.id} block={block} />}</BlockFlow>);
+    expect(html.match(/t-button-row/g)).toHaveLength(1);
+    expect(html.indexOf("t-button-row")).toBeLessThan(html.indexOf(">a<"));
+    expect(html.indexOf(">c<")).toBeGreaterThan(html.indexOf("</div></div>"));
   });
 });

@@ -46,7 +46,7 @@ describe("history", () => {
     const list = (await (await request("/api/pages/home/revisions")).json()) as { id: number; author: string }[];
     expect(list[0]!.author).toBe("Test");
     const revision = (await (await request(`/api/pages/home/revisions/${list[0]!.id}`)).json()) as { blocks: unknown[] };
-    expect(revision.blocks).toEqual([{ id: "a", type: "heading", text: "Neu" }]);
+    expect(revision.blocks).toEqual([{ id: "a", type: "heading", text: "Neu", level: 1 }]);
     expect((await request("/api/pages/home/revisions/999999")).status).toBe(404);
     expect((await request("/api/pages/nope/revisions")).status).toBe(404);
     expect(pages.revisions("home")).toHaveLength(1);
@@ -63,7 +63,7 @@ describe("static export", () => {
     const used = await media.add(await upload("#f00"));
     const unused = await media.add(await upload("#00f"));
     const about = pages.create("Über uns");
-    pages.save(about.slug, { blocks: [{ id: "i", type: "image", src: used.url, alt: "Laden" }] });
+    pages.save(about.slug, { blocks: [{ id: "i", type: "image", src: used.url, alt: "Laden", caption: "", width: "normal" }] });
 
     const files = await exportSite({ pages, settings, media }, "https://baeckerei-sonne.de");
     const names = [...files.keys()].sort();
