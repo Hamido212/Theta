@@ -13,7 +13,7 @@ const put = (body: unknown, slug = "home") =>
   request(`/api/pages/${slug}`, {
     method: "PUT",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ version: pages.get(slug)?.version, ...(body as object) }),
   });
 
 test("a fresh site has a home page with three blocks", async () => {
@@ -23,10 +23,13 @@ test("a fresh site has a home page with three blocks", async () => {
   expect(pages.get("home")!.blocks.map((b) => b.type)).toEqual(["heading", "text", "image"]);
 });
 
-test("saving blocks persists them and updates the public page", async () => {
+test("saving keeps the live page unchanged until explicit publication", async () => {
   const res = await put({ blocks: [{ id: "a", type: "heading", text: "Neu gespeichert" }] });
   expect(res.status).toBe(200);
   expect(pages.get("home")!.blocks).toEqual([{ id: "a", type: "heading", text: "Neu gespeichert", level: 1 }]);
+  expect(await (await request("/")).text()).not.toContain("Neu gespeichert");
+  const published = await put({ action: "publish", blocks: pages.get("home")!.blocks });
+  expect(published.status).toBe(200);
   expect(await (await request("/")).text()).toContain("Neu gespeichert");
 });
 

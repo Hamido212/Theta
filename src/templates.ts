@@ -89,8 +89,8 @@ export function insertTemplate(list: Block[], at: number, template: Block[]): Bl
   const opensBand = template[0]?.type === "section";
   if (opensBand && after.length > 0 && after[0]!.type !== "section") {
     const running = list.slice(0, at).findLast((block) => block.type === "section");
-    const background = running?.type === "section" ? running.background : "plain";
-    template = [...template, { id: crypto.randomUUID(), type: "section", background }];
+    const continuation = running?.type === "section" ? running : { type: "section" as const, background: "plain" as const };
+    template = [...template, { ...continuation, id: crypto.randomUUID() }];
   }
   return [...list.slice(0, at), ...template, ...after];
 }
@@ -137,3 +137,5 @@ export const pageTemplates = Object.entries(pages).map(([id, { label }]) => ({ i
 export const isPageTemplate = (id: unknown): id is PageTemplateId => typeof id === "string" && Object.hasOwn(pages, id);
 
 export const pageBlocks = (template: PageTemplateId, title: string): Block[] => withIds(pages[template].drafts(title));
+
+export type SavedSectionTemplate = { id: string; title: string; blocks: Block[] };

@@ -12,13 +12,16 @@ test.each([
 });
 
 describe("pages", () => {
-  test("creating a page opens its editor and adds it to the menu", async () => {
-    const { request } = await testSite({ login: true });
+  test("creating a page opens a private draft; publication adds it to the menu", async () => {
+    const { request, pages } = await testSite({ login: true });
     const res = await request("/admin/pages", form({ title: "Über uns" }));
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toBe("/edit/ueber-uns");
 
     expect((await request("/edit/ueber-uns")).status).toBe(200);
+    expect((await request("/ueber-uns")).status).toBe(404);
+    expect(await (await request("/")).text()).not.toContain('<a href="/ueber-uns">');
+    pages.publish("ueber-uns", true);
     const page = await request("/ueber-uns");
     expect(page.status).toBe(200);
     expect(await page.text()).toContain("<title>Über uns · Meine Website</title>");
@@ -46,6 +49,7 @@ describe("pages", () => {
     pages.create("Eins");
     pages.create("Zwei");
     pages.create("Drei");
+    for (const slug of ["eins", "zwei", "drei"]) pages.publish(slug, true);
     expect(pages.nav().map((item) => item.slug)).toEqual(["eins", "zwei", "drei"]);
 
     await request("/admin/pages/drei/move", form({ direction: "up" }));
@@ -54,13 +58,13 @@ describe("pages", () => {
     const put = await request("/api/pages/eins", {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ title: "Eins", description: "Die erste", inNav: false, blocks: [] }),
+      body: JSON.stringify({ version: pages.get("eins")!.version, action: "publish", title: "Eins", description: "Die erste", inNav: false, blocks: [] }),
     });
     expect(put.status).toBe(200);
     expect(pages.get("eins")).toMatchObject({ description: "Die erste", inNav: false });
     expect(pages.nav().map((item) => item.slug)).toEqual(["drei", "zwei"]);
 
-    const del = await request("/admin/pages/zwei/delete", form({}));
+    const del = await request("/admin/pages/zwei/delete", form({ version: String(pages.get("zwei")!.version) }));
     expect(del.headers.get("location")).toBe("/admin");
     expect((await request("/zwei")).status).toBe(404);
   });
@@ -110,6 +114,7 @@ describe("admin", () => {
   test("footer text, legal pages and logo appear on every page", async () => {
     const { request, pages, settings } = await testSite({ login: true });
     const imprint = pages.create("Impressum");
+    pages.publish(imprint.slug, true);
     const fields = { name: "Bäckerei Sonne", description: "", logo: "/media/theta.svg", imprint: imprint.slug, privacy: "" };
     const saved = await request("/admin/site", form({ ...fields, footer: "Hauptstraße 1\r\n28195 Bremen\r\n\r\n[Instagram](https://instagram.com/sonne)" }));
     expect(saved.status).toBe(302);
@@ -137,6 +142,7 @@ describe("admin", () => {
 test("sitemap.xml and robots.txt are served", async () => {
   const { request, pages } = await testSite();
   pages.create("Kontakt");
+  pages.publish("kontakt", true);
   const sitemap = await (await request("/sitemap.xml")).text();
   expect(sitemap).toContain("<loc>http://localhost/</loc>");
   expect(sitemap).toContain("<loc>http://localhost/kontakt</loc>");

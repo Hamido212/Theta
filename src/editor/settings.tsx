@@ -34,15 +34,18 @@ import {
 } from "../blocks";
 import type { ReactNode } from "react";
 import { videoSource } from "../theme/video";
+import { FocalPointPicker } from "./focal-point";
 import { MediaPicker } from "./media-picker";
 
-// Settings shown below a block for everything that is not edited directly on the page.
+// Inspector settings for everything that is not edited directly on the page.
 
 type Props<B extends Block> = { block: B; onChange: (patch: Partial<B>) => void; pages: NavItem[] };
 
 export function BlockSettings({ block, onChange, pages }: Props<Block>) {
   const change = onChange as never;
   switch (block.type) {
+    case "section":
+      return <SectionSettings block={block} onChange={change} pages={pages} />;
     case "image":
       return <ImageSettings block={block} onChange={change} pages={pages} />;
     case "gallery":
@@ -68,7 +71,7 @@ export function BlockSettings({ block, onChange, pages }: Props<Block>) {
   }
 }
 
-// Small choices shown in the block's toolbar, next to its name.
+// Controlled block variants shown in the inspector.
 export function BlockOptions({ block, onChange }: { block: Block; onChange: (patch: Partial<Block>) => void }) {
   if (block.type === "heading") {
     return (
@@ -135,6 +138,7 @@ function ImageSettings({ block, onChange }: Props<ImageBlock>) {
         <input value={block.alt} placeholder="Was ist auf dem Bild zu sehen?" onChange={(e) => onChange({ alt: e.target.value })} />
       </label>
       <AltHint src={block.src} alt={block.alt} />
+      <FocalPointPicker image={block} onChange={(focal) => onChange({ focal })} />
     </div>
   );
 }
@@ -153,6 +157,7 @@ function GallerySettings({ block, onChange }: Props<GalleryBlock>) {
             Entfernen
           </button>
           <AltHint src={image.src} alt={image.alt} />
+          <FocalPointPicker image={image} onChange={(focal) => update(i, { focal })} />
         </fieldset>
       ))}
       <div className="theta-inline">
@@ -218,6 +223,7 @@ function HeroSettings({ block, onChange, pages }: Props<HeroBlock>) {
         </label>
       )}
       <AltHint src={block.src} alt={block.alt} />
+      <FocalPointPicker image={block} onChange={(focal) => onChange({ focal })} />
       {block.buttons.map((button, i) => (
         <LinkTarget key={i} id={`${block.id}-${i}`} label={i === 0 ? "Ziel des ersten Buttons" : "Ziel des zweiten Buttons"} value={button.href} pages={pages} onChange={(href) => setHref(i, href)} />
       ))}
@@ -287,6 +293,7 @@ function ColumnsSettings({ block, onChange, pages }: Props<ColumnsBlock>) {
               <input value={item.alt} placeholder="Bildbeschreibung" aria-label={`Karte ${i + 1}: Bildbeschreibung`} onChange={(e) => update(i, { alt: e.target.value })} />
             )}
             <AltHint src={item.src} alt={item.alt} />
+            <FocalPointPicker image={item} onChange={(focal) => update(i, { focal })} />
             <LinkTarget id={`${block.id}-${i}`} label="Link (optional)" value={item.href} pages={pages} onChange={(href) => update(i, { href })} />
           </fieldset>
         ))}
@@ -410,4 +417,19 @@ function TeamSettings({ block, onChange }: Props<TeamBlock>) {
       details={photo}
     />
   );
+}
+
+function SectionSettings({ block, onChange }: Props<SectionBlock>) {
+  return <div className="theta-settings">
+    <label>Inhaltsbreite<select value={block.width ?? "content"} onChange={(e) => onChange({ width: e.target.value as SectionBlock["width"] })}>
+      <option value="content">Textbreite</option><option value="wide">Breit</option><option value="full">Volle Breite</option>
+    </select></label>
+    <label>Abstand<select value={block.spacing ?? "normal"} onChange={(e) => onChange({ spacing: e.target.value as SectionBlock["spacing"] })}>
+      <option value="compact">Kompakt</option><option value="normal">Normal</option><option value="spacious">Großzügig</option>
+    </select></label>
+    <label>Ausrichtung<select value={block.align ?? "left"} onChange={(e) => onChange({ align: e.target.value as SectionBlock["align"] })}>
+      <option value="left">Links</option><option value="center">Zentriert</option>
+    </select></label>
+    <p className="theta-note">Verschieben, Verdoppeln und Löschen wirken auf den ganzen Abschnitt bis zum nächsten Abschnitt.</p>
+  </div>;
 }

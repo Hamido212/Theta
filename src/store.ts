@@ -14,7 +14,7 @@ import {
   parseBlocks,
 } from "./blocks";
 import { type ThemeSettings, defaultTheme, parseTheme } from "./theme/tokens";
-import { type PageTemplateId, pageBlocks } from "./templates";
+import { type SavedSectionTemplate, type PageTemplateId, pageBlocks } from "./templates";
 
 type PageRow = {
   slug: string;
@@ -25,9 +25,12 @@ type PageRow = {
   blocks: string;
   updated_at: string;
   published_at: string | null;
+  version: number;
+  live_data: string | null;
+  deleted_at: string | null;
 };
 
-const PAGE_COLUMNS = "slug, kind, title, description, in_nav, blocks, updated_at, published_at";
+const PAGE_COLUMNS = "slug, kind, title, description, in_nav, blocks, updated_at, published_at, version, live_data, deleted_at";
 
 // How many saved versions of each page are kept.
 const MAX_REVISIONS = 50;
@@ -53,24 +56,27 @@ const RESERVED_SLUGS = new Set([
 
 export class PageStore {
   constructor(private db: Database) {
-    if (!this.get(HOME)) this.insert(HOME, homePage, 0);
+    if (!this.get(HOME)) {
+      this.insert(HOME, homePage, 0);
+      this.publish(HOME, true);
+    }
   }
 
   get(slug: string): Page | null {
-    const row = this.db.query<PageRow, [string]>(`SELECT ${PAGE_COLUMNS} FROM pages WHERE slug = ?`).get(slug);
+    const row = this.db.query<PageRow, [string]>(`SELECT ${PAGE_COLUMNS} FROM pages WHERE slug = ? AND deleted_at IS NULL`).get(slug);
     return row ? toPage(row) : null;
   }
 
   // A published post, or null for drafts and pages.
   post(slug: string): Page | null {
-    const page = this.get(slug);
+    const page = this.live(slug);
     return page?.kind === "post" && page.publishedAt ? page : null;
   }
 
   // All pages (not posts), home first, then in navigation order.
   list(): Page[] {
     return this.db
-      .query<PageRow, []>(`SELECT ${PAGE_COLUMNS} FROM pages WHERE kind = 'page' ORDER BY slug != 'home', position, title`)
+      .query<PageRow, []>(`SELECT ${PAGE_COLUMNS} FROM pages WHERE kind = 'page' AND deleted_at IS NULL ORDER BY slug != 'home', position, title`)
       .all()
       .map(toPage);
   }
@@ -79,26 +85,47 @@ export class PageStore {
   posts({ drafts = false } = {}): Page[] {
     return this.db
       .query<PageRow, []>(
-        `SELECT ${PAGE_COLUMNS} FROM pages WHERE kind = 'post' ${drafts ? "" : "AND published_at IS NOT NULL"}
+        `SELECT ${PAGE_COLUMNS} FROM pages WHERE kind = 'post' AND deleted_at IS NULL ${drafts ? "" : "AND published_at IS NOT NULL"}
          ORDER BY published_at IS NOT NULL, published_at DESC, updated_at DESC`,
       )
       .all()
-      .map(toPage);
+      .map((row) => drafts ? toPage(row) : toLive(row)!).filter(Boolean);
   }
 
-  // Every page and post, e.g. to find the media they use.
+  live(slug: string): Page | null {
+    const row = this.db.query<PageRow, [string]>(`SELECT ${PAGE_COLUMNS} FROM pages WHERE slug = ? AND deleted_at IS NULL`).get(slug);
+    return row ? toLive(row) : null;
+  }
+
+  publishedPages(): Page[] {
+    return this.db.query<PageRow, []>(`SELECT ${PAGE_COLUMNS} FROM pages
+      WHERE kind = 'page' AND deleted_at IS NULL AND live_data IS NOT NULL
+      ORDER BY slug != 'home', position, json_extract(live_data, '$.title')`).all()
+      .flatMap((row) => toLive(row) ?? []);
+  }
+
+  // Keep images referenced by drafts, live snapshots, history and trash recoverable.
   all(): Page[] {
-    return [...this.list(), ...this.posts({ drafts: true })];
+    const rows = this.db.query<PageRow, []>(`SELECT ${PAGE_COLUMNS} FROM pages`).all();
+    return rows.flatMap((row) => {
+      const page = toPage(row);
+      return [page, ...(toLive(row) ? [toLive(row)!] : []),
+        ...this.revisions(row.slug).map((r) => ({ ...page, ...this.revision(row.slug, r.id)! }))];
+    });
+  }
+
+  trash(): Page[] {
+    return this.db.query<PageRow, []>(`SELECT ${PAGE_COLUMNS} FROM pages WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC`).all().map(toPage);
   }
 
   // The main menu. Legal pages chosen for the footer are left out, they already appear there.
   nav(site?: Pick<SiteSettings, "imprint" | "privacy">): NavItem[] {
     const legal = [site?.imprint, site?.privacy];
-    const items: NavItem[] = this.list()
+    const items: NavItem[] = this.publishedPages()
       .filter((page) => page.slug !== HOME && page.inNav && !legal.includes(page.slug))
       .map(({ slug, title }) => ({ slug, title }));
     // The blog shows up in the menu as soon as there is something to read.
-    const hasPosts = this.db.query("SELECT 1 FROM pages WHERE kind = 'post' AND published_at IS NOT NULL LIMIT 1").get();
+    const hasPosts = this.db.query("SELECT 1 FROM pages WHERE kind = 'post' AND published_at IS NOT NULL AND deleted_at IS NULL LIMIT 1").get();
     if (hasPosts) items.push({ slug: BLOG, title: "Blog", href: `/${BLOG}` });
     return items;
   }
@@ -108,7 +135,7 @@ export class PageStore {
     return [
       { slug: site.imprint, title: "Impressum" },
       { slug: site.privacy, title: "Datenschutz" },
-    ].filter((item) => item.slug !== "" && this.get(item.slug)?.kind === "page");
+    ].filter((item) => item.slug !== "" && this.live(item.slug)?.kind === "page");
   }
 
   // Creates a page or post from a title and returns it. The address is derived from the title.
@@ -116,7 +143,7 @@ export class PageStore {
     const cleanTitle = parseTitle(title);
     const base = slugify(cleanTitle);
     let slug = base;
-    for (let n = 2; RESERVED_SLUGS.has(slug) || this.get(slug); n++) slug = `${base}-${n}`;
+    for (let n = 2; RESERVED_SLUGS.has(slug) || this.db.query("SELECT 1 FROM pages WHERE slug = ?").get(slug); n++) slug = `${base}-${n}`;
 
     const { next } = this.db.query<{ next: number }, []>("SELECT COALESCE(MAX(position), 0) + 1 AS next FROM pages").get()!;
     const blocks = pageBlocks(template, cleanTitle);
@@ -131,27 +158,41 @@ export class PageStore {
     slug: string,
     changes: { title?: string; description?: string; inNav?: boolean; blocks?: Block[]; published?: boolean },
     author = "",
+    options: { version?: number; autosave?: boolean; action?: "save" | "publish" | "unpublish" } = {},
   ): Page {
-    const page = this.get(slug);
-    if (!page) throw new ValidationError("Seite nicht gefunden");
-    const { published, ...rest } = changes;
-    const defined = Object.fromEntries(Object.entries(rest).filter(([, value]) => value !== undefined));
-    const next = { ...page, ...defined };
-    const publishedAt = page.kind === "post" && published !== undefined ? publicationDate(page, published) : page.publishedAt;
-    this.db
-      .query("UPDATE pages SET title = ?, description = ?, in_nav = ?, blocks = ?, updated_at = ?, published_at = ? WHERE slug = ?")
-      .run(next.title, next.description, next.inNav ? 1 : 0, JSON.stringify(next.blocks), new Date().toISOString(), publishedAt, slug);
-    const saved = this.get(slug)!;
-    this.recordRevision(saved, author);
-    return saved;
+    return this.db.transaction(() => {
+      const page = this.get(slug);
+      if (!page) throw new ValidationError("Seite nicht gefunden");
+      checkVersion(page, options.version);
+      const { published, ...rest } = changes;
+      const defined = Object.fromEntries(Object.entries(rest).filter(([, value]) => value !== undefined));
+      const next = { ...page, ...defined };
+      const changed = contentKey(page) !== contentKey(next);
+      if (changed) {
+        this.db.query("UPDATE pages SET title = ?, description = ?, in_nav = ?, blocks = ?, updated_at = ?, version = version + 1 WHERE slug = ?")
+          .run(next.title, next.description, next.inNav ? 1 : 0, JSON.stringify(next.blocks), new Date().toISOString(), slug);
+        this.recordRevision(this.get(slug)!, author, options.autosave === true);
+      }
+      const action = options.action ?? (published === undefined ? "save" : published ? "publish" : "unpublish");
+      if (action !== "save") return this.publish(slug, action === "publish");
+      return this.get(slug)!;
+    })();
   }
 
-  // Publishes a post or takes it back to a draft, without touching its content or history.
-  publish(slug: string, published: boolean): Page {
-    const page = this.get(slug);
-    if (page?.kind !== "post") throw new ValidationError("Beitrag nicht gefunden");
-    this.db.query("UPDATE pages SET published_at = ? WHERE slug = ?").run(publicationDate(page, published), slug);
-    return this.get(slug)!;
+  publish(slug: string, published: boolean, version?: number): Page {
+    return this.db.transaction(() => {
+      const page = this.get(slug);
+      if (!page) throw new ValidationError("Seite nicht gefunden");
+      checkVersion(page, version);
+      if (slug === HOME && !published) throw new ValidationError("Die Startseite bleibt veröffentlicht. Veröffentliche stattdessen eine neue Fassung.");
+      const now = new Date().toISOString();
+      const data = published ? JSON.stringify({ ...contentData(page), updatedAt: now }) : null;
+      this.db.query("UPDATE pages SET live_data = ?, published_at = ?, version = version + 1 WHERE slug = ?")
+        .run(data, published ? (page.publishedAt ?? now) : null, slug);
+      // A publication is a history boundary: the next autosave must not replace it.
+      this.db.query("UPDATE revisions SET autosave = 0 WHERE slug = ?").run(slug);
+      return this.get(slug)!;
+    })();
   }
 
   // Saved versions of a page, newest first.
@@ -179,10 +220,17 @@ export class PageStore {
     };
   }
 
-  private recordRevision(page: Page, author: string) {
+  private recordRevision(page: Page, author: string, autosave = false) {
+    const last = this.db.query<{ id: number; autosave: number; author: string; created_at: string }, [string]>("SELECT id, autosave, author, created_at FROM revisions WHERE slug = ? ORDER BY id DESC LIMIT 1").get(page.slug);
+    // One checkpoint per five-minute typing session, bounded by manual saves/publication.
+    if (autosave && last?.autosave && last.author === author && Date.now() - Date.parse(last.created_at) < 300_000) {
+      this.db.query("UPDATE revisions SET title = ?, description = ?, in_nav = ?, blocks = ? WHERE id = ?")
+        .run(page.title, page.description, page.inNav ? 1 : 0, JSON.stringify(page.blocks), last.id);
+      return;
+    }
     this.db
-      .query("INSERT INTO revisions (slug, title, description, in_nav, blocks, author, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
-      .run(page.slug, page.title, page.description, page.inNav ? 1 : 0, JSON.stringify(page.blocks), author, page.updatedAt);
+      .query("INSERT INTO revisions (slug, title, description, in_nav, blocks, author, created_at, autosave) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(page.slug, page.title, page.description, page.inNav ? 1 : 0, JSON.stringify(page.blocks), author, page.updatedAt, autosave ? 1 : 0);
     this.db
       .query(
         `DELETE FROM revisions WHERE slug = ? AND id NOT IN
@@ -191,10 +239,21 @@ export class PageStore {
       .run(page.slug, page.slug);
   }
 
-  delete(slug: string) {
+  delete(slug: string, version?: number) {
     if (slug === HOME) throw new ValidationError("Die Startseite kann nicht gelöscht werden");
-    this.db.query("DELETE FROM pages WHERE slug = ?").run(slug);
-    this.db.query("DELETE FROM revisions WHERE slug = ?").run(slug);
+    const page = this.get(slug);
+    if (!page) throw new ValidationError("Seite nicht gefunden");
+    checkVersion(page, version);
+    this.db.query("UPDATE pages SET deleted_at = ?, version = version + 1 WHERE slug = ?")
+      .run(new Date().toISOString(), slug);
+  }
+
+  restore(slug: string, version?: number): Page {
+    const page = this.trash().find((page) => page.slug === slug);
+    if (!page) throw new ValidationError("Seite nicht im Papierkorb gefunden");
+    checkVersion(page, version);
+    this.db.query("UPDATE pages SET deleted_at = NULL, live_data = NULL, published_at = NULL, version = version + 1 WHERE slug = ?").run(slug);
+    return this.get(slug)!;
   }
 
   // Moves a page one step up (-1) or down (1) in the navigation order.
@@ -220,6 +279,23 @@ export class PageStore {
 export class SettingsStore {
   constructor(private db: Database) {}
 
+  templates(): SavedSectionTemplate[] {
+    return this.db.query<{ id: string; title: string; blocks: string }, []>("SELECT id, title, blocks FROM section_templates ORDER BY created_at DESC, id").all()
+      .map((row) => ({ ...row, blocks: parseBlocks(JSON.parse(row.blocks)) }));
+  }
+
+  saveTemplate(title: unknown, input: unknown): SavedSectionTemplate {
+    const blocks = parseBlocks(input);
+    if (blocks.length < 2 || blocks[0]?.type !== "section" || blocks.slice(1).some((b) => b.type === "section")) throw new ValidationError("Bitte einen Abschnitt mit Inhalt auswählen.");
+    if (this.templates().length >= 100) throw new ValidationError("Höchstens 100 eigene Vorlagen. Lösche zuerst eine nicht mehr benötigte Vorlage.");
+    const template = { id: crypto.randomUUID(), title: parseTitle(title), blocks };
+    this.db.query("INSERT INTO section_templates (id, title, blocks, created_at) VALUES (?, ?, ?, ?)")
+      .run(template.id, template.title, JSON.stringify(blocks), new Date().toISOString());
+    return template;
+  }
+
+  deleteTemplate(id: string) { this.db.query("DELETE FROM section_templates WHERE id = ?").run(id); }
+
   site(): SiteSettings {
     return { ...defaultSite, ...(this.get("site") as Partial<SiteSettings> | null) };
   }
@@ -244,7 +320,7 @@ export class SettingsStore {
     const current = this.site();
     const page = (value: unknown, field: string) => {
       const slug = value === undefined ? "" : String(value);
-      if (slug !== "" && !this.db.query("SELECT 1 FROM pages WHERE slug = ? AND kind = 'page'").get(slug)) {
+      if (slug !== "" && !this.db.query("SELECT 1 FROM pages WHERE slug = ? AND kind = 'page' AND deleted_at IS NULL").get(slug)) {
         throw new ValidationError(`Die Seite für ${field} gibt es nicht`);
       }
       return slug;
@@ -308,9 +384,27 @@ export function slugify(title: string): string {
   return slug || "seite";
 }
 
-// Publishing keeps the date a post first went public; taking it back to a draft clears it.
-function publicationDate(page: Page, published: boolean): string | null {
-  return published ? (page.publishedAt ?? new Date().toISOString()) : null;
+export class ConflictError extends Error {
+  constructor() { super("Diese Seite wurde inzwischen geändert. Lade den Serverstand, bevor du weiter speicherst. Dein Text bleibt hier erhalten."); }
+}
+
+export function parseVersion(value: unknown): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1) throw new ValidationError("Bitte die Seite neu laden: Die Versionsnummer fehlt oder ist ungültig.");
+  return value;
+}
+
+function checkVersion(page: Page, version?: number) {
+  if (version !== undefined && page.version !== version) throw new ConflictError();
+}
+
+type ContentData = Pick<Page, "title" | "description" | "inNav" | "blocks">;
+const contentData = (page: ContentData): ContentData => ({ title: page.title, description: page.description, inNav: page.inNav, blocks: page.blocks });
+const contentKey = (page: ContentData) => JSON.stringify(contentData({ ...page, blocks: parseBlocks(page.blocks) }));
+
+function toLive(row: PageRow): Page | null {
+  if (!row.live_data || !row.published_at) return null;
+  const live = JSON.parse(row.live_data);
+  return { ...toPage(row), ...live, blocks: parseBlocks(live.blocks), hasChanges: false };
 }
 
 function toPage(row: PageRow): Page {
@@ -323,6 +417,9 @@ function toPage(row: PageRow): Page {
     blocks: parseBlocks(JSON.parse(row.blocks)),
     updatedAt: row.updated_at,
     publishedAt: row.published_at,
+    version: row.version,
+    deletedAt: row.deleted_at,
+    hasChanges: !row.live_data || contentKey({ title: row.title, description: row.description, inNav: row.in_nav === 1, blocks: parseBlocks(JSON.parse(row.blocks)) }) !== contentKey(JSON.parse(row.live_data)),
   };
 }
 

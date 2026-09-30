@@ -30,7 +30,7 @@
 
 body {
   margin: 0;
-  /* Full-width images are 100vw wide, which would otherwise add a sideways scrollbar. */
+  /* Full-width images would otherwise add a sideways scrollbar. */
   overflow-x: clip;
   background: var(--t-color-bg);
   color: var(--t-color-text);
@@ -134,11 +134,11 @@ body {
 
 /* Wide and full images break out of the text column, centred on it. */
 .t-width-wide {
-  --t-breakout: min(72rem, 100vw - 2 * var(--t-space));
+  --t-breakout: min(72rem, var(--t-viewport, 100vw) - 2 * var(--t-space));
 }
 
 .t-width-full {
-  --t-breakout: 100vw;
+  --t-breakout: var(--t-viewport, 100vw);
 }
 
 .t-width-wide,
@@ -664,9 +664,9 @@ div.t-faq-item .t-faq-question {
    (src/theme/tokens.ts), which redefines them per band, so every block adapts. */
 .t-band,
 .t-hero {
-  width: 100vw;
-  margin-inline: calc((100% - 100vw) / 2);
-  padding-inline: calc((100vw - 100%) / 2);
+  width: var(--t-viewport, 100vw);
+  margin-inline: calc((100% - var(--t-viewport, 100vw)) / 2);
+  padding-inline: calc((var(--t-viewport, 100vw) - 100%) / 2);
   background: var(--t-color-bg);
   color: var(--t-color-text);
 }
@@ -769,3 +769,13 @@ div.t-faq-item .t-faq-question {
   margin-top: calc(var(--t-space) * 0.25);
   text-shadow: none;
 }
+
+/* Controlled section variants, shared by editor, live pages and static export. */
+.t-band-width-wide { padding-inline: max(1rem, calc((var(--t-viewport, 100vw) - 72rem) / 2)); }
+.t-band-width-full { padding-inline: 1rem; }
+.t-band-spacing-compact { padding-block: var(--t-space); }
+.t-band-spacing-spacious { padding-block: calc(var(--t-space) * 4); }
+.t-band-align-center { text-align: center; }
+.t-band-align-center .t-button-row { justify-content: center; }
+.t-band .t-hero { width: 100%; margin-inline: 0; padding-inline: 1rem; }
+.t-band .t-width-wide, .t-band .t-width-full { max-width: 100%; margin-inline: 0; }

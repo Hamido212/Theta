@@ -134,6 +134,7 @@ function AdminBar({ user, current }: { user: User; current: "pages" | "blog" | "
         <a href="/admin/media" aria-current={current === "media" ? "page" : undefined}>
           Mediathek
         </a>
+        <a href="/admin/trash">Papierkorb</a>
         <a href="/admin/design" aria-current={current === "design" ? "page" : undefined}>
           Design
         </a>
@@ -191,6 +192,7 @@ export function renderDashboard({ user, pages, site, media, origin, error }: Das
                       <a href={editPath(page.slug)} className="a-title">
                         {page.title}
                       </a>
+                      <span className="a-muted"> · {page.publishedAt ? (page.hasChanges ? "Live · Änderungen im Entwurf" : "Veröffentlicht") : "Entwurf"}</span>
                       <span className="a-muted">
                         {publicPath(page.slug)}
                         {page.slug === HOME
@@ -220,7 +222,8 @@ export function renderDashboard({ user, pages, site, media, origin, error }: Das
                         <details className="a-delete">
                           <summary>Löschen</summary>
                           <form method="post" action={`/admin/pages/${page.slug}/delete`}>
-                            <button className="a-danger">„{page.title}“ endgültig löschen</button>
+                            <input type="hidden" name="version" value={page.version} />
+                            <button className="a-danger">„{page.title}“ in den Papierkorb</button>
                           </form>
                         </details>
                       </>
@@ -358,6 +361,7 @@ export function renderBlog({ user, posts, error }: BlogProps) {
                       </span>
                     </div>
                     <form method="post" action={`/admin/blog/${post.slug}/publish`}>
+                      <input type="hidden" name="version" value={post.version} />
                       <button name="published" value={post.publishedAt ? "0" : "1"}>
                         {post.publishedAt ? "Zurück zu Entwurf" : "Veröffentlichen"}
                       </button>
@@ -365,7 +369,8 @@ export function renderBlog({ user, posts, error }: BlogProps) {
                     <details className="a-delete">
                       <summary>Löschen</summary>
                       <form method="post" action={`/admin/blog/${post.slug}/delete`}>
-                        <button className="a-danger">„{post.title}“ endgültig löschen</button>
+                        <input type="hidden" name="version" value={post.version} />
+                        <button className="a-danger">„{post.title}“ in den Papierkorb</button>
                       </form>
                     </details>
                     <a className="a-button" href={editPath(post.slug)}>
@@ -546,4 +551,16 @@ export function renderDesign({ user, theme, error }: { user: User; theme: ThemeS
       </body>
     </html>,
   );
+}
+
+export function renderTrash({ user, pages, error }: { user: User; pages: Page[]; error?: string }) {
+  return html(<html lang="de"><AdminHead title="Papierkorb" /><body>
+    <AdminBar user={user} current="pages" />
+    <main className="a-main"><h1>Papierkorb</h1><ErrorMessage error={error} />
+      <p>Gelöschte Seiten und ihr Verlauf bleiben erhalten. Wiederhergestellte Seiten starten als Entwurf.</p>
+      {pages.length === 0 ? <p>Der Papierkorb ist leer.</p> : <ul className="a-list">{pages.map((page) => <li key={page.slug}>
+        <div className="a-grow"><strong>{page.title}</strong><p className="a-muted">{page.kind === "post" ? "Beitrag" : "Seite"} · {page.deletedAt && formatDate(page.deletedAt)}</p></div>
+        <form method="post" action={`/admin/trash/${page.slug}/restore`}><input type="hidden" name="version" value={page.version} /><button>Als Entwurf wiederherstellen</button></form>
+      </li>)}</ul>}
+    </main></body></html>);
 }

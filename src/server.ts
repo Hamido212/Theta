@@ -4,7 +4,7 @@ import { type Context, Hono, type MiddlewareHandler } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { bodyLimit } from "hono/body-limit";
 import { csrf } from "hono/csrf";
-import { renderBlog, renderDashboard, renderDesign, renderLogin, renderMediaLibrary, renderSetup, renderSetupLocked } from "./admin/pages";
+import { renderBlog, renderDashboard, renderDesign, renderLogin, renderMediaLibrary, renderSetup, renderSetupLocked, renderTrash } from "./admin/pages";
 import { AuthError, AuthStore, type User } from "./auth";
 import { BLOG, HOME, type NavItem, ValidationError, editPath, pagePath, parseBlocks } from "./blocks";
 import { openDatabase } from "./db";
@@ -20,7 +20,7 @@ import {
   renderRobots,
   renderSitemap,
 } from "./render";
-import { PageStore, SettingsStore, parseDescription, parseTitle, slugify } from "./store";
+import { ConflictError, parseVersion, PageStore, SettingsStore, parseDescription, parseTitle, slugify } from "./store";
 import { zip } from "./zip";
 import { type PresetId, PRESETS, defaultTheme, isFontFile, themeCss } from "./theme/tokens";
 import { isPageTemplate } from "./templates";
@@ -108,9 +108,9 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
 
   // Public site
 
-  app.get("/", (c) => c.html(renderPage(pages.get(HOME)!, siteContext(c))));
+  app.get("/", (c) => c.html(renderPage(pages.live(HOME)!, siteContext(c))));
   app.get("/sitemap.xml", (c) =>
-    c.body(renderSitemap([...pages.list(), ...pages.posts()], siteContext(c).origin), 200, { "content-type": "application/xml; charset=utf-8" }),
+    c.body(renderSitemap([...pages.publishedPages(), ...pages.posts()], siteContext(c).origin), 200, { "content-type": "application/xml; charset=utf-8" }),
   );
   app.get("/robots.txt", (c) => c.text(renderRobots(siteContext(c).origin)));
   app.get(`/${HOME}`, (c) => c.redirect("/", 301));
@@ -181,6 +181,11 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
   });
 
   // Editing (login required)
+  app.use("/admin/*", async (c, next) => { c.header("Cache-Control", "private, no-store"); await next(); });
+  app.use("/api/*", async (c, next) => { c.header("Cache-Control", "private, no-store"); await next(); });
+  app.use("/admin", async (c, next) => { c.header("Cache-Control", "private, no-store"); await next(); });
+  app.use("/edit", async (c, next) => { c.header("Cache-Control", "private, no-store"); await next(); });
+  app.use("/edit/*", async (c, next) => { c.header("Cache-Control", "private, no-store"); await next(); });
 
   app.use("/edit", requireUser);
   app.use("/edit/*", requireUser);
@@ -191,14 +196,14 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
   const editor = (c: Context<Env>, slug: string) => {
     const page = pages.get(slug);
     if (!page) return c.html(renderNotFound(siteContext(c)), 404);
-    const posts = pages.posts();
+    const posts = pages.posts({ drafts: true });
     // Everything a button can link to.
     const targets: NavItem[] = [
       ...pages.list().map(({ slug, title }) => ({ slug, title })),
-      ...(posts.length > 0 ? [{ slug: BLOG, title: "Blog", href: `/${BLOG}` }] : []),
+      ...(posts.some((post) => post.publishedAt) ? [{ slug: BLOG, title: "Blog", href: `/${BLOG}` }] : []),
       ...posts.map((post) => ({ slug: post.slug, title: post.title, href: pagePath(post) })),
     ];
-    return c.html(renderEditor({ page, site: settings.site(), nav: pages.nav(settings.site()), legal: pages.legal(settings.site()), pages: targets }, themeCss(settings.theme())));
+    return c.html(renderEditor({ page, site: settings.site(), nav: pages.nav(settings.site()), legal: pages.legal(settings.site()), pages: targets, templates: settings.templates() }, themeCss(settings.theme())));
   };
   app.get("/edit", (c) => editor(c, HOME));
   app.get(`/edit/${HOME}`, (c) => c.redirect("/edit"));
@@ -217,7 +222,7 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
     try {
       return c.redirect(editPath(pages.create(String(form.title ?? ""), c.get("user").name, "page", isPageTemplate(form.template) ? form.template : "blank").slug));
     } catch (err) {
-      if (err instanceof ValidationError) return dashboard(c, err.message);
+      if (err instanceof ValidationError || err instanceof ConflictError) return dashboard(c, err.message);
       throw err;
     }
   });
@@ -228,12 +233,13 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
     return c.redirect("/admin");
   });
 
-  app.post("/admin/pages/:slug/delete", (c) => {
+  app.post("/admin/pages/:slug/delete", async (c) => {
+    const form = await c.req.parseBody();
     try {
-      pages.delete(c.req.param("slug"));
+      pages.delete(c.req.param("slug"), parseVersion(Number(form.version)));
       return c.redirect("/admin");
     } catch (err) {
-      if (err instanceof ValidationError) return dashboard(c, err.message);
+      if (err instanceof ValidationError || err instanceof ConflictError) return dashboard(c, err.message);
       throw err;
     }
   });
@@ -250,7 +256,7 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
     try {
       return c.redirect(editPath(pages.create(String(form.title ?? ""), c.get("user").name, "post").slug));
     } catch (err) {
-      if (err instanceof ValidationError) return blog(c, err.message);
+      if (err instanceof ValidationError || err instanceof ConflictError) return blog(c, err.message);
       throw err;
     }
   });
@@ -258,18 +264,59 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
   app.post("/admin/blog/:slug/publish", async (c) => {
     const form = await c.req.parseBody();
     try {
-      pages.publish(c.req.param("slug"), form.published === "1");
+      pages.publish(c.req.param("slug"), form.published === "1", parseVersion(Number(form.version)));
       return c.redirect("/admin/blog");
     } catch (err) {
-      if (err instanceof ValidationError) return blog(c, err.message);
+      if (err instanceof ValidationError || err instanceof ConflictError) return blog(c, err.message);
       throw err;
     }
   });
 
-  app.post("/admin/blog/:slug/delete", (c) => {
-    if (pages.get(c.req.param("slug"))?.kind !== "post") return blog(c, "Beitrag nicht gefunden");
-    pages.delete(c.req.param("slug"));
-    return c.redirect("/admin/blog");
+  app.post("/admin/blog/:slug/delete", async (c) => {
+    const form = await c.req.parseBody();
+    try {
+      if (pages.get(c.req.param("slug"))?.kind !== "post") return blog(c, "Beitrag nicht gefunden");
+      pages.delete(c.req.param("slug"), parseVersion(Number(form.version)));
+      return c.redirect("/admin/blog");
+    } catch (err) {
+      if (err instanceof ValidationError || err instanceof ConflictError) return blog(c, err.message);
+      throw err;
+    }
+  });
+
+  app.get("/admin/trash", (c) => c.html(renderTrash({ user: c.get("user"), pages: pages.trash() })));
+  app.post("/admin/trash/:slug/restore", async (c) => {
+    const form = await c.req.parseBody();
+    try {
+      const page = pages.restore(c.req.param("slug"), parseVersion(Number(form.version)));
+      return c.redirect(editPath(page.slug));
+    } catch (err) {
+      if (err instanceof ValidationError || err instanceof ConflictError) return c.html(renderTrash({ user: c.get("user"), pages: pages.trash(), error: err.message }), 409);
+      throw err;
+    }
+  });
+
+  app.get("/admin/preview/:slug", (c) => {
+    const page = pages.get(c.req.param("slug"));
+    c.header("Cache-Control", "private, no-store");
+    c.header("X-Robots-Tag", "noindex, nofollow");
+    return page ? c.html(renderPage(page, siteContext(c))) : c.notFound();
+  });
+
+  app.get("/api/section-templates", (c) => c.json(settings.templates()));
+  app.post("/api/section-templates", bodyLimit({ maxSize: 2_000_000 }), async (c) => {
+    const body = await c.req.json().catch(() => null);
+    try {
+      if (!body) throw new ValidationError("Ungültige Vorlage");
+      return c.json(settings.saveTemplate(body.title, body.blocks), 201);
+    } catch (err) {
+      if (err instanceof ValidationError) return c.json({ error: err.message }, 400);
+      throw err;
+    }
+  });
+  app.delete("/api/section-templates/:id", (c) => {
+    settings.deleteTemplate(c.req.param("id"));
+    return c.json({ ok: true });
   });
 
   // Media library
@@ -281,6 +328,12 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
       for (const [, id] of JSON.stringify(page.blocks).matchAll(/\/media\/([\w-]+)\//g)) {
         const titles = usage.get(id!) ?? [];
         if (!titles.includes(page.title)) usage.set(id!, [...titles, page.title]);
+      }
+    }
+    // Saved templates must also remain usable after their source page changes.
+    for (const template of settings.templates()) {
+      for (const [, id] of JSON.stringify(template.blocks).matchAll(/\/media\/([\w-]+)\//g)) {
+        usage.set(id!, [...(usage.get(id!) ?? []), `Vorlage: ${template.title}`]);
       }
     }
     // The logo is used on every page.
@@ -320,6 +373,7 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
   });
 
   app.post("/admin/media/:id/delete", (c) => {
+    if (mediaUsage().has(c.req.param("id"))) return library(c, "Dieses Bild wird noch in einer Seite, einer veröffentlichten Fassung oder im Verlauf verwendet.");
     media.delete(c.req.param("id"));
     return c.redirect("/admin/media");
   });
@@ -393,7 +447,7 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
       });
       return c.redirect("/admin");
     } catch (err) {
-      if (err instanceof ValidationError) return dashboard(c, err.message);
+      if (err instanceof ValidationError || err instanceof ConflictError) return dashboard(c, err.message);
       throw err;
     }
   });
@@ -413,23 +467,26 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
     return revision ? c.json(revision) : c.json({ error: "Version nicht gefunden" }, 404);
   });
 
-  app.put("/api/pages/:slug", async (c) => {
+  app.put("/api/pages/:slug", bodyLimit({ maxSize: 2_000_000 }), async (c) => {
     const page = pages.get(c.req.param("slug"));
     if (!page) return c.json({ error: "Seite nicht gefunden" }, 404);
 
     const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
-    if (!body) return c.json({ error: "Ungültiges JSON" }, 400);
+    if (!body || typeof body !== "object" || Array.isArray(body)) return c.json({ error: "Ungültiges JSON" }, 400);
     try {
+      const version = parseVersion(body.version);
+      const action = body.action ?? "save";
+      if (action !== "save" && action !== "publish" && action !== "unpublish") throw new ValidationError("Unbekannte Speicheraktion");
       return c.json(
         pages.save(page.slug, {
           title: body.title === undefined ? undefined : parseTitle(body.title),
           description: body.description === undefined ? undefined : parseDescription(body.description),
           inNav: body.inNav === undefined ? undefined : body.inNav === true,
-          blocks: parseBlocks(body.blocks),
-          published: body.published === undefined ? undefined : body.published === true,
-        }, c.get("user").name),
+          blocks: body.blocks === undefined ? undefined : parseBlocks(body.blocks),
+        }, c.get("user").name, { version, action, autosave: body.autosave === true }),
       );
     } catch (err) {
+      if (err instanceof ConflictError) return c.json({ error: err.message, conflict: true }, 409);
       if (err instanceof ValidationError) return c.json({ error: err.message, block: err.block }, 400);
       throw err;
     }
@@ -462,7 +519,7 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
 
   // Every other page of the site. Registered last so it cannot shadow the routes above.
   app.get("/:slug{[a-z0-9-]+}", (c) => {
-    const page = pages.get(c.req.param("slug"));
+    const page = pages.live(c.req.param("slug"));
     // Posts live under /blog only.
     return page?.kind === "page" ? c.html(renderPage(page, siteContext(c))) : c.html(renderNotFound(siteContext(c)), 404);
   });

@@ -14,7 +14,7 @@ type Stores = { pages: PageStore; settings: SettingsStore; media: MediaStore };
 export async function exportSite({ pages, settings, media }: Stores, origin: string): Promise<Map<string, Uint8Array>> {
   const encoder = new TextEncoder();
   const files = new Map<string, Uint8Array>();
-  const all = pages.list();
+  const all = pages.publishedPages();
   const posts = pages.posts();
   const context: SiteContext = {
     site: settings.site(),

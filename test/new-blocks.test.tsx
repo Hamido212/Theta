@@ -137,8 +137,8 @@ describe("sections and hero", () => {
     ]);
     expect(html).toBe(
       '<div class="t-text"><p><span>Oben</span></p></div>' +
-        '<div class="t-band t-band-soft"><div class="t-text"><p><span>Getönt</span></p></div></div>' +
-        '<div class="t-band t-band-inverse"><div class="t-text"><p><span>Dunkel</span></p></div></div>',
+        '<div class="t-band t-band-soft t-band-width-content t-band-spacing-normal t-band-align-left"><div class="t-text"><p><span>Getönt</span></p></div></div>' +
+        '<div class="t-band t-band-inverse t-band-width-content t-band-spacing-normal t-band-align-left"><div class="t-text"><p><span>Dunkel</span></p></div></div>',
     );
   });
 

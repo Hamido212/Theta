@@ -1,5 +1,6 @@
+import { unzipSync, strFromU8 } from "fflate";
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sharp from "sharp";
@@ -24,7 +25,7 @@ describe("history", () => {
     expect(pages.revision("home", list[1]!.id)).toBeNull();
   });
 
-  test("only the newest 50 versions are kept, and they go with the page", async () => {
+  test("only the newest 50 versions are kept, and they survive in the trash", async () => {
     const { pages } = await testSite();
     const { slug } = pages.create("Viel bearbeitet");
     for (let i = 0; i < 60; i++) pages.save(slug, { blocks: [{ id: "a", type: "text", text: `Stand ${i}` }] });
@@ -32,7 +33,8 @@ describe("history", () => {
     expect(list).toHaveLength(50);
     expect(pages.revision(slug, list[0]!.id)!.blocks[0]).toMatchObject({ text: "Stand 59" });
     pages.delete(slug);
-    expect(pages.revisions(slug)).toHaveLength(0);
+    expect(pages.revisions(slug)).toHaveLength(50);
+    expect(pages.trash()[0]!.slug).toBe(slug);
   });
 
   test("the API lists and returns versions for logged-in users only", async () => {
@@ -40,7 +42,7 @@ describe("history", () => {
     const put = await request("/api/pages/home", {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ blocks: [{ id: "a", type: "heading", text: "Neu" }] }),
+      body: JSON.stringify({ version: pages.get("home")!.version, blocks: [{ id: "a", type: "heading", text: "Neu" }] }),
     });
     expect(put.status).toBe(200);
     const list = (await (await request("/api/pages/home/revisions")).json()) as { id: number; author: string }[];
@@ -65,6 +67,7 @@ describe("static export", () => {
     const about = pages.create("Über uns");
     pages.save(about.slug, { blocks: [{ id: "i", type: "image", src: used.url, alt: "Laden", caption: "", width: "normal" }] });
 
+    pages.publish(about.slug, true);
     const files = await exportSite({ pages, settings, media }, "https://baeckerei-sonne.de");
     const names = [...files.keys()].sort();
     expect(names).toEqual(
@@ -106,13 +109,9 @@ describe("static export", () => {
     expect(res.headers.get("content-type")).toBe("application/zip");
     expect(res.headers.get("content-disposition")).toBe('attachment; filename="meine-website-website.zip"');
 
-    const path = join(mkdtempSync(join(tmpdir(), "theta-zip-")), "site.zip");
-    writeFileSync(path, new Uint8Array(await res.arrayBuffer()));
-    const check = Bun.spawnSync(["unzip", "-t", path]);
-    expect(check.exitCode).toBe(0);
-    const list = Bun.spawnSync(["unzip", "-l", path]).stdout.toString();
-    expect(list).toContain("index.html");
-    expect(list).toContain("assets/theme.css");
+    const archive = unzipSync(new Uint8Array(await res.arrayBuffer()));
+    expect(strFromU8(archive["index.html"]!)).toContain("Willkommen bei Theta");
+    expect(strFromU8(archive["assets/theme.css"]!)).toContain(".t-page");
 
     const bad = await request("/admin/export", form({ url: "javascript:alert(1)" }));
     expect(bad.status).toBe(400);

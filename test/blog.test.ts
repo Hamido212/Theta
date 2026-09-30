@@ -13,7 +13,7 @@ describe("posts", () => {
   test("a new post is a draft that nobody can see", async () => {
     const { pages, request } = await testSite();
     const post = pages.create("Unser neues Brot", "Hamid", "post");
-    expect(post).toMatchObject({ slug: "unser-neues-brot", kind: "post", publishedAt: null, inNav: false });
+    expect(post).toMatchObject({ slug: "unser-neues-brot", kind: "post", publishedAt: null, version: 1, hasChanges: true, deletedAt: null, inNav: false });
 
     expect((await request("/blog/unser-neues-brot")).status).toBe(404);
     expect(await (await request("/blog")).text()).not.toContain("Unser neues Brot");
@@ -80,16 +80,16 @@ describe("posts", () => {
     expect(pages.get(older.slug)!.publishedAt).toBeNull();
   });
 
-  test("pages cannot be published and cannot take the blog's address", async () => {
+  test("pages support publication and cannot take the blog's address", async () => {
     const { pages } = await testSite();
-    expect(() => pages.publish("home", true)).toThrow("Beitrag nicht gefunden");
+    expect(pages.publish("home", true).publishedAt).not.toBeNull();
     pages.save("home", { published: true });
-    expect(pages.get("home")!.publishedAt).toBeNull();
+    expect(pages.get("home")!.publishedAt).not.toBeNull();
     expect(pages.create("Blog").slug).toBe("blog-2");
   });
 
   test("the excerpt is the description, or else the start of the first text", () => {
-    const base = { slug: "a", kind: "post" as const, title: "A", inNav: false, updatedAt: "", publishedAt: null };
+    const base = { slug: "a", kind: "post" as const, title: "A", inNav: false, updatedAt: "", publishedAt: null, version: 1, hasChanges: true, deletedAt: null };
     expect(excerpt({ ...base, description: "Kurz", blocks: [] })).toBe("Kurz");
     const long = "Wort ".repeat(100);
     const text = excerpt({ ...base, description: "", blocks: [{ id: "t", type: "text", text: long }] });
@@ -106,26 +106,26 @@ describe("blog admin", () => {
     expect(created.headers.get("location")).toBe("/edit/hallo-welt");
     expect(await (await request("/admin/blog")).text()).toContain("Entwurf");
 
-    expect((await request("/admin/blog/hallo-welt/publish", form({ published: "1" }))).status).toBe(302);
+    expect((await request("/admin/blog/hallo-welt/publish", form({ published: "1", version: String(pages.get("hallo-welt")!.version) }))).status).toBe(302);
     expect(pages.get("hallo-welt")!.publishedAt).not.toBeNull();
     expect(await (await request("/admin/blog")).text()).toContain("Zurück zu Entwurf");
 
-    expect((await request("/admin/blog/hallo-welt/publish", form({ published: "0" }))).status).toBe(302);
+    expect((await request("/admin/blog/hallo-welt/publish", form({ published: "0", version: String(pages.get("hallo-welt")!.version) }))).status).toBe(302);
     expect(pages.get("hallo-welt")!.publishedAt).toBeNull();
 
     expect((await request("/admin/blog/home/delete", form({}))).status).toBe(400);
     expect(pages.get("home")).not.toBeNull();
-    expect((await request("/admin/blog/hallo-welt/delete", form({}))).status).toBe(302);
+    expect((await request("/admin/blog/hallo-welt/delete", form({ version: String(pages.get("hallo-welt")!.version) }))).status).toBe(302);
     expect(pages.get("hallo-welt")).toBeNull();
   });
 
-  test("the editor saves the published switch of a post", async () => {
+  test("the editor explicitly publishes the submitted draft of a post", async () => {
     const { pages, request } = await testSite({ login: true });
     const { slug } = pages.create("Neuigkeiten", "", "post");
     const editor = await (await request(`/edit/${slug}`)).text();
     expect(editor).toContain('"kind":"post"');
 
-    const res = await request(`/api/pages/${slug}`, json({ published: true, blocks: [] }));
+    const res = await request(`/api/pages/${slug}`, json({ version: pages.get(slug)!.version, action: "publish", blocks: [] }));
     expect(res.status).toBe(200);
     expect(((await res.json()) as { publishedAt: string | null }).publishedAt).not.toBeNull();
     expect(pages.revisions(slug)[0]!.author).toBe("Test");

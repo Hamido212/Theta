@@ -10,7 +10,7 @@ const page: Page = {
   description: "Wer wir sind",
   inNav: true,
   updatedAt: "2026-09-30T12:00:00.000Z",
-  publishedAt: null,
+  publishedAt: null, version: 1, hasChanges: true, deletedAt: null,
   blocks: [
     { id: "h", type: "heading", text: "Hallo <Welt>", level: 1 },
     { id: "t", type: "text", text: "Erster Absatz\nzweite Zeile\n\nZweiter Absatz" },
