@@ -25,6 +25,14 @@ describe("pages", () => {
     expect(await (await request("/")).text()).toContain('<a href="/ueber-uns">Über uns</a>');
   });
 
+  test("a new page can start from a template; unknown templates fall back to an empty page", async () => {
+    const { request, pages } = await testSite({ login: true });
+    await request("/admin/pages", form({ title: "Start", template: "home" }));
+    expect(pages.get("start")!.blocks.map((b) => b.type)).toContain("hero");
+    await request("/admin/pages", form({ title: "Leer", template: "__proto__" }));
+    expect(pages.get("leer")!.blocks).toMatchObject([{ type: "heading", text: "Leer" }]);
+  });
+
   test("addresses stay unique and never collide with the app", async () => {
     const { pages } = await testSite();
     expect(pages.create("Kontakt").slug).toBe("kontakt");

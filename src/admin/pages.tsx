@@ -4,6 +4,7 @@ import type { User } from "../auth";
 import { HOME, type Page, type SiteSettings, editPath, formatDate, pagePath, publicPath } from "../blocks";
 import type { MediaItem } from "../media";
 import { FONTS, PRESETS, type PresetId, RADIUS, SCHEMES, SPACING, type ThemeSettings, WIDTH, accentWarnings } from "../theme/tokens";
+import { pageTemplates } from "../templates";
 
 // Server-rendered admin screens. They work without JavaScript: plain forms that post back.
 
@@ -219,6 +220,13 @@ export function renderDashboard({ user, pages, site, media, origin, error }: Das
             </ul>
             <form method="post" action="/admin/pages" className="a-inline">
               <input name="title" placeholder="Titel der neuen Seite, z. B. Über uns" required maxLength={200} aria-label="Titel der neuen Seite" />
+              <select name="template" aria-label="Vorlage" defaultValue="blank">
+                {pageTemplates.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.id === "blank" ? "Leere Seite" : `Vorlage: ${template.label}`}
+                  </option>
+                ))}
+              </select>
               <button className="a-primary">Seite anlegen</button>
             </form>
           </section>

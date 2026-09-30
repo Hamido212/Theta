@@ -129,6 +129,28 @@
   font: 0.9rem/1.2 var(--t-font-body);
 }
 
+.theta-add-menu {
+  flex-direction: column;
+}
+
+.theta-add-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.theta-add-heading {
+  width: 100%;
+  margin-top: 0.3rem;
+  color: var(--t-color-muted);
+  font-size: 0.8rem;
+}
+
+.theta-template {
+  border-style: dashed;
+}
+
 .theta-add .theta-add-menu {
   margin: 0;
   padding: 0;
