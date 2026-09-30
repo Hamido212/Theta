@@ -5,11 +5,14 @@ import type {
   ColumnsBlock,
   GalleryBlock,
   HeadingBlock,
+  HeroBlock,
   ImageBlock,
   QuoteBlock,
+  SectionBlock,
   TextBlock,
   VideoBlock,
 } from "../blocks";
+import { sectionBackgrounds } from "../blocks";
 import { TextField } from "./fields";
 import { Img } from "./image";
 import { videoPlaceholder, videoSource } from "./video";
@@ -168,24 +171,90 @@ function Quote({ block, edit }: BlockProps<QuoteBlock>) {
   );
 }
 
-// Renders a page's blocks in order. Buttons that follow each other share one row,
+function Hero({ block, edit }: BlockProps<HeroBlock>) {
+  const changeButton = (index: number, label: string) =>
+    edit?.({ buttons: block.buttons.map((button, i) => (i === index ? { ...button, label } : button)) });
+  const buttons = edit ? block.buttons : block.buttons.filter((button) => button.label.trim() && button.href);
+  return (
+    <div className={block.src ? "t-hero t-hero-image" : "t-hero t-band-accent"}>
+      {block.src && <Img src={block.src} alt={block.alt} sizes="100vw" eager />}
+      <div className="t-hero-content">
+        <h1 className="t-hero-title">
+          <TextField value={block.title} onChange={edit && ((title) => edit({ title }))} placeholder="Titel der Seite" />
+        </h1>
+        {(edit || block.text.trim()) && (
+          <div className="t-hero-text">
+            <TextField value={block.text} onChange={edit && ((text) => edit({ text }))} multiline placeholder="Ein Satz, der neugierig macht" />
+          </div>
+        )}
+        {buttons.length > 0 && (
+          <div className="t-button-row">
+            {buttons.map((button, i) => {
+              const className = `t-button t-button-${i === 0 ? "primary" : "secondary"}`;
+              return edit ? (
+                <span key={i} className={className}>
+                  <TextField value={button.label} onChange={(label) => changeButton(i, label)} placeholder="Beschriftung" />
+                </span>
+              ) : (
+                <a key={i} className={className} href={button.href}>
+                  {button.label}
+                </a>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// In the editor a section shows where a new band starts; on the site it is the band itself.
+function Section({ block, edit }: BlockProps<SectionBlock>) {
+  return edit ? <div className="t-section-marker">Neuer Abschnitt · {sectionBackgrounds[block.background]}</div> : null;
+}
+
+type FlowProps = { blocks: Block[]; children: (block: Block, index: number) => ReactNode };
+
+// Renders a page's blocks in order. A section block starts a full-width band that holds
+// everything up to the next section. Buttons that follow each other share one row,
 // so "Book now" and "Menu" sit side by side instead of stacking.
-export function BlockFlow({ blocks, children }: { blocks: Block[]; children: (block: Block, index: number) => ReactNode }) {
-  const runs: { start: number; blocks: Block[] }[] = [];
+export function BlockFlow({ blocks, children }: FlowProps) {
+  const bands: { start: number; blocks: Block[] }[] = [{ start: 0, blocks: [] }];
   blocks.forEach((block, index) => {
-    const last = runs.at(-1);
-    if (block.type === "button" && last?.blocks[0]?.type === "button") last.blocks.push(block);
-    else runs.push({ start: index, blocks: [block] });
+    if (block.type === "section") bands.push({ start: index, blocks: [block] });
+    else bands.at(-1)!.blocks.push(block);
   });
   return (
     <>
-      {runs.map(({ start, blocks: run }) =>
+      {bands.map(({ start, blocks: band }) => {
+        const first = band[0];
+        if (first?.type !== "section") return <Runs key="start" blocks={band} start={start} children={children} />;
+        return (
+          <div key={first.id} className={`t-band t-band-${first.background}`}>
+            <Runs blocks={band} start={start} children={children} />
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+function Runs({ blocks, start, children }: FlowProps & { start: number }) {
+  const runs: { start: number; blocks: Block[] }[] = [];
+  blocks.forEach((block, i) => {
+    const last = runs.at(-1);
+    if (block.type === "button" && last?.blocks[0]?.type === "button") last.blocks.push(block);
+    else runs.push({ start: start + i, blocks: [block] });
+  });
+  return (
+    <>
+      {runs.map(({ start: at, blocks: run }) =>
         run.length > 1 ? (
           <div key={run[0]!.id} className="t-button-row">
-            {run.map((block, i) => children(block, start + i))}
+            {run.map((block, i) => children(block, at + i))}
           </div>
         ) : (
-          <Fragment key={run[0]!.id}>{children(run[0]!, start)}</Fragment>
+          <Fragment key={run[0]!.id}>{children(run[0]!, at)}</Fragment>
         ),
       )}
     </>
@@ -214,5 +283,9 @@ export function BlockView({ block, edit }: BlockProps<Block>) {
       return <Quote block={block} edit={e} />;
     case "divider":
       return <hr className="t-divider" />;
+    case "section":
+      return <Section block={block} edit={e} />;
+    case "hero":
+      return <Hero block={block} edit={e} />;
   }
 }

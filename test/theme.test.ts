@@ -21,6 +21,15 @@ describe("tokens", () => {
     expect(dark).toContain("--t-color-bg: #16151a");
   });
 
+  test("section bands get their own colours: tinted, accent and the opposite palette", () => {
+    const css = themeCss({ ...defaultTheme("klar"), colorScheme: "light" });
+    expect(css).toContain(".t-band-soft{");
+    expect(css).toContain(".t-band-accent{--t-color-bg: #4f46e5;--t-color-text: #ffffff");
+    expect(css).toMatch(/\.t-band-inverse\{--t-color-bg: #16151a/);
+    const auto = themeCss(defaultTheme("klar"));
+    expect(auto.split("@media")[1]).toMatch(/\.t-band-inverse\{--t-color-bg: #fbfaf7/);
+  });
+
   test("button text colour follows the accent", () => {
     expect(readableOn("#4f46e5")).toBe("#ffffff");
     expect(readableOn("#facc15")).toBe("#111111");

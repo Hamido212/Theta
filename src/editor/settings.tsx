@@ -5,6 +5,12 @@ import {
   type GalleryBlock,
   type HeadingBlock,
   type HeadingLevel,
+  type HeroBlock,
+  MAX_HERO_BUTTONS,
+  type SectionBackground,
+  type SectionBlock,
+  emptyHeroButton,
+  sectionBackgrounds,
   type ImageBlock,
   type ImageWidth,
   MAX_COLUMNS,
@@ -33,6 +39,8 @@ export function BlockSettings({ block, onChange, pages }: Props<Block>) {
       return <ColumnsSettings block={block} onChange={change} pages={pages} />;
     case "video":
       return <VideoSettings block={block} onChange={change} pages={pages} />;
+    case "hero":
+      return <HeroSettings block={block} onChange={change} pages={pages} />;
     default:
       return null;
   }
@@ -50,6 +58,21 @@ export function BlockOptions({ block, onChange }: { block: Block; onChange: (pat
         <option value={1}>Seitentitel</option>
         <option value={2}>Überschrift</option>
         <option value={3}>Kleine Überschrift</option>
+      </select>
+    );
+  }
+  if (block.type === "section") {
+    return (
+      <select
+        aria-label="Hintergrund des Abschnitts"
+        value={block.background}
+        onChange={(e) => onChange({ background: e.target.value as SectionBackground } as Partial<SectionBlock>)}
+      >
+        {Object.entries(sectionBackgrounds).map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
       </select>
     );
   }
@@ -124,26 +147,67 @@ function GallerySettings({ block, onChange }: Props<GalleryBlock>) {
   );
 }
 
-function ButtonSettings({ block, onChange, pages }: Props<ButtonBlock>) {
-  const listId = `theta-pages-${block.id}`;
+// A link target field that suggests the site's own pages.
+function LinkTarget({ id, label, value, pages, onChange }: { id: string; label: string; value: string; pages: NavItem[]; onChange: (href: string) => void }) {
+  const listId = `theta-pages-${id}`;
+  return (
+    <label>
+      {label}
+      <input value={value} list={listId} placeholder="Eine Seite wie /kontakt, https://… oder mailto:…" onChange={(e) => onChange(e.target.value)} />
+      <datalist id={listId}>
+        {pages.map((page) => (
+          <option key={page.slug} value={page.href ?? publicPath(page.slug)}>
+            {page.title}
+          </option>
+        ))}
+      </datalist>
+    </label>
+  );
+}
+
+function HeroSettings({ block, onChange, pages }: Props<HeroBlock>) {
+  const setHref = (index: number, href: string) =>
+    onChange({ buttons: block.buttons.map((button, i) => (i === index ? { ...button, href } : button)) });
   return (
     <div className="theta-settings">
-      <label>
-        Ziel
-        <input
-          value={block.href}
-          list={listId}
-          placeholder="Eine Seite wie /kontakt, https://… oder mailto:…"
-          onChange={(e) => onChange({ href: e.target.value })}
-        />
-        <datalist id={listId}>
-          {pages.map((page) => (
-            <option key={page.slug} value={page.href ?? publicPath(page.slug)}>
-              {page.title}
-            </option>
-          ))}
-        </datalist>
-      </label>
+      <div className="theta-inline">
+        <MediaPicker label={block.src ? "Anderes Bild wählen" : "Hintergrundbild wählen oder hochladen"} onSelect={([item]) => onChange({ src: item!.url })} />
+        {block.src && (
+          <button className="theta-button" onClick={() => onChange({ src: "", alt: "" })}>
+            Ohne Bild, in Akzentfarbe
+          </button>
+        )}
+      </div>
+      {block.src && (
+        <label>
+          Bildbeschreibung
+          <input value={block.alt} placeholder="Was ist auf dem Bild zu sehen?" onChange={(e) => onChange({ alt: e.target.value })} />
+        </label>
+      )}
+      <AltHint src={block.src} alt={block.alt} />
+      {block.buttons.map((button, i) => (
+        <LinkTarget key={i} id={`${block.id}-${i}`} label={i === 0 ? "Ziel des ersten Buttons" : "Ziel des zweiten Buttons"} value={button.href} pages={pages} onChange={(href) => setHref(i, href)} />
+      ))}
+      <div className="theta-inline">
+        {block.buttons.length < MAX_HERO_BUTTONS && (
+          <button className="theta-button" onClick={() => onChange({ buttons: [...block.buttons, emptyHeroButton()] })}>
+            + Button
+          </button>
+        )}
+        {block.buttons.length > 0 && (
+          <button className="theta-button" onClick={() => onChange({ buttons: block.buttons.slice(0, -1) })}>
+            − Letzten Button entfernen
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ButtonSettings({ block, onChange, pages }: Props<ButtonBlock>) {
+  return (
+    <div className="theta-settings">
+      <LinkTarget id={block.id} label="Ziel" value={block.href} pages={pages} onChange={(href) => onChange({ href })} />
       <label>
         Art
         <select value={block.variant} onChange={(e) => onChange({ variant: e.target.value as ButtonBlock["variant"] })}>

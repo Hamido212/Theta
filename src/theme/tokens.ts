@@ -105,13 +105,24 @@ export function themeCss(theme: ThemeSettings): string {
     `--t-radius: ${RADIUS[theme.radius].value}`,
     `--t-radius-button: ${RADIUS[theme.radius].button}`,
   ];
-  const light = colors(preset.light, theme.accent);
-  const dark = colors(preset.dark, darkAccent(theme.accent, preset.dark.bg));
+  const lightAccent = theme.accent;
+  const nightAccent = darkAccent(theme.accent, preset.dark.bg);
+  const light = colors(preset.light, lightAccent);
+  const dark = colors(preset.dark, nightAccent);
   const root = (vars: string[]) => `:root{${vars.join(";")}}`;
+  // Section bands redefine the colours, so every block inside adapts on its own.
+  const bands = (palette: Palette, accent: string, other: Palette, otherAccent: string) =>
+    [
+      `.t-band-soft{${colors({ ...palette, bg: mix(palette.bg, palette.text, 0.05) }, accent).join(";")}}`,
+      `.t-band-accent{${colors({ bg: accent, text: readableOn(accent), muted: readableOn(accent) }, readableOn(accent)).join(";")}}`,
+      `.t-band-inverse{${colors(other, otherAccent).join(";")}}`,
+    ].join("");
+  const lightBands = bands(preset.light, lightAccent, preset.dark, nightAccent);
+  const darkBands = bands(preset.dark, nightAccent, preset.light, lightAccent);
 
-  if (theme.colorScheme === "light") return root([...shared, ...light, "color-scheme: light"]);
-  if (theme.colorScheme === "dark") return root([...shared, ...dark, "color-scheme: dark"]);
-  return `${root([...shared, ...light, "color-scheme: light dark"])}@media (prefers-color-scheme: dark){${root(dark)}}`;
+  if (theme.colorScheme === "light") return root([...shared, ...light, "color-scheme: light"]) + lightBands;
+  if (theme.colorScheme === "dark") return root([...shared, ...dark, "color-scheme: dark"]) + darkBands;
+  return `${root([...shared, ...light, "color-scheme: light dark"])}${lightBands}@media (prefers-color-scheme: dark){${root(dark)}${darkBands}}`;
 }
 
 function colors(palette: Palette, accent: string): string[] {

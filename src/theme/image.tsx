@@ -6,13 +6,14 @@ import type { ImageInfo } from "../blocks";
 export type ImageLookup = (src: string) => ImageInfo | null;
 export const ImageLookupContext = createContext<ImageLookup>(() => null);
 
-export function Img({ src, alt, sizes }: { src: string; alt: string; sizes: string }) {
+// eager is for pictures at the very top of the page, which should not wait for lazy loading.
+export function Img({ src, alt, sizes, eager = false }: { src: string; alt: string; sizes: string; eager?: boolean }) {
   const info = useContext(ImageLookupContext)(src);
   return (
     <img
       src={src}
       alt={alt}
-      loading="lazy"
+      loading={eager ? "eager" : "lazy"}
       decoding="async"
       {...(info && { srcSet: info.srcset, sizes, width: info.width, height: info.height })}
     />
