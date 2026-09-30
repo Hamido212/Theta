@@ -51,6 +51,8 @@ const migrations: string[] = [
      created_at  TEXT NOT NULL
    );
    CREATE INDEX revisions_by_page ON revisions (slug, id)`,
+  `ALTER TABLE pages ADD COLUMN kind TEXT NOT NULL DEFAULT 'page';
+   ALTER TABLE pages ADD COLUMN published_at TEXT`,
 ];
 
 export function openDatabase(path: string): Database {

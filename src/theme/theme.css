@@ -249,3 +249,66 @@ a.t-button:hover {
   border: 0;
   border-top: 1px solid color-mix(in srgb, var(--t-color-muted) 40%, transparent);
 }
+
+.t-post-meta {
+  margin: 0 0 calc(var(--t-space) * -0.5);
+  color: var(--t-color-muted);
+  font-size: 0.95rem;
+}
+
+.t-post-back {
+  margin: var(--t-space) 0 0;
+  font-size: 1rem;
+}
+
+.t-post-back a {
+  color: var(--t-color-accent);
+}
+
+.t-posts {
+  display: grid;
+  gap: calc(var(--t-space) * 2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.t-post-card {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.t-post-card img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  margin-bottom: 0.5rem;
+  border-radius: var(--t-radius);
+}
+
+.t-post-card .t-post-meta {
+  margin: 0;
+}
+
+.t-post-title {
+  margin: 0;
+  font-family: var(--t-font-heading);
+  font-size: 1.6rem;
+  line-height: 1.2;
+}
+
+.t-post-title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.t-post-title a:hover {
+  color: var(--t-color-accent);
+}
+
+.t-post-teaser {
+  margin: 0;
+  color: var(--t-color-muted);
+}

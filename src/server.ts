@@ -4,13 +4,22 @@ import { type Context, Hono, type MiddlewareHandler } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { bodyLimit } from "hono/body-limit";
 import { csrf } from "hono/csrf";
-import { renderDashboard, renderDesign, renderLogin, renderMediaLibrary, renderSetup, renderSetupLocked } from "./admin/pages";
+import { renderBlog, renderDashboard, renderDesign, renderLogin, renderMediaLibrary, renderSetup, renderSetupLocked } from "./admin/pages";
 import { AuthError, AuthStore, type User } from "./auth";
-import { HOME, ValidationError, editPath, parseBlocks } from "./blocks";
+import { BLOG, HOME, type NavItem, ValidationError, editPath, pagePath, parseBlocks } from "./blocks";
 import { openDatabase } from "./db";
 import { exportSite } from "./export";
 import { MAX_UPLOAD_BYTES, type MediaItem, MediaStore, builtinMedia } from "./media";
-import { type SiteContext, renderEditor, renderNotFound, renderPage, renderRobots, renderSitemap } from "./render";
+import {
+  type SiteContext,
+  renderBlogIndex,
+  renderEditor,
+  renderFeed,
+  renderNotFound,
+  renderPage,
+  renderRobots,
+  renderSitemap,
+} from "./render";
 import { PageStore, SettingsStore, parseDescription, parseTitle, slugify } from "./store";
 import { zip } from "./zip";
 import { type PresetId, PRESETS, defaultTheme, themeCss } from "./theme/tokens";
@@ -98,9 +107,21 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
   // Public site
 
   app.get("/", (c) => c.html(renderPage(pages.get(HOME)!, siteContext(c))));
-  app.get("/sitemap.xml", (c) => c.body(renderSitemap(pages.list(), siteContext(c).origin), 200, { "content-type": "application/xml; charset=utf-8" }));
+  app.get("/sitemap.xml", (c) =>
+    c.body(renderSitemap([...pages.list(), ...pages.posts()], siteContext(c).origin), 200, { "content-type": "application/xml; charset=utf-8" }),
+  );
   app.get("/robots.txt", (c) => c.text(renderRobots(siteContext(c).origin)));
   app.get(`/${HOME}`, (c) => c.redirect("/", 301));
+
+  app.get(`/${BLOG}`, (c) => c.html(renderBlogIndex(pages.posts(), siteContext(c))));
+  app.get(`/${BLOG}/feed.xml`, (c) =>
+    c.body(renderFeed(pages.posts(), settings.site(), siteContext(c).origin), 200, { "content-type": "application/rss+xml; charset=utf-8" }),
+  );
+  // Drafts are only visible in the editor.
+  app.get(`/${BLOG}/:slug{[a-z0-9-]+}`, (c) => {
+    const post = pages.post(c.req.param("slug"));
+    return post ? c.html(renderPage(post, siteContext(c))) : c.html(renderNotFound(siteContext(c)), 404);
+  });
 
   // Accounts
 
@@ -168,8 +189,14 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
   const editor = (c: Context<Env>, slug: string) => {
     const page = pages.get(slug);
     if (!page) return c.html(renderNotFound(siteContext(c)), 404);
-    const all = pages.list().map(({ slug, title }) => ({ slug, title }));
-    return c.html(renderEditor({ page, site: settings.site(), nav: pages.nav(), pages: all }, themeCss(settings.theme())));
+    const posts = pages.posts();
+    // Everything a button can link to.
+    const targets: NavItem[] = [
+      ...pages.list().map(({ slug, title }) => ({ slug, title })),
+      ...(posts.length > 0 ? [{ slug: BLOG, title: "Blog", href: `/${BLOG}` }] : []),
+      ...posts.map((post) => ({ slug: post.slug, title: post.title, href: pagePath(post) })),
+    ];
+    return c.html(renderEditor({ page, site: settings.site(), nav: pages.nav(), pages: targets }, themeCss(settings.theme())));
   };
   app.get("/edit", (c) => editor(c, HOME));
   app.get(`/edit/${HOME}`, (c) => c.redirect("/edit"));
@@ -209,12 +236,46 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
     }
   });
 
+  // Blog
+
+  const blog = (c: Context<Env>, error?: string) =>
+    c.html(renderBlog({ user: c.get("user"), posts: pages.posts({ drafts: true }), error }), error ? 400 : 200);
+
+  app.get("/admin/blog", (c) => blog(c));
+
+  app.post("/admin/blog", async (c) => {
+    const form = await c.req.parseBody();
+    try {
+      return c.redirect(editPath(pages.create(String(form.title ?? ""), c.get("user").name, "post").slug));
+    } catch (err) {
+      if (err instanceof ValidationError) return blog(c, err.message);
+      throw err;
+    }
+  });
+
+  app.post("/admin/blog/:slug/publish", async (c) => {
+    const form = await c.req.parseBody();
+    try {
+      pages.publish(c.req.param("slug"), form.published === "1");
+      return c.redirect("/admin/blog");
+    } catch (err) {
+      if (err instanceof ValidationError) return blog(c, err.message);
+      throw err;
+    }
+  });
+
+  app.post("/admin/blog/:slug/delete", (c) => {
+    if (pages.get(c.req.param("slug"))?.kind !== "post") return blog(c, "Beitrag nicht gefunden");
+    pages.delete(c.req.param("slug"));
+    return c.redirect("/admin/blog");
+  });
+
   // Media library
 
   // Which pages use each uploaded image, so deleting one in use can warn first.
   const mediaUsage = () => {
     const usage = new Map<string, string[]>();
-    for (const page of pages.list()) {
+    for (const page of pages.all()) {
       for (const [, id] of JSON.stringify(page.blocks).matchAll(/\/media\/([\w-]+)\//g)) {
         const titles = usage.get(id!) ?? [];
         if (!titles.includes(page.title)) usage.set(id!, [...titles, page.title]);
@@ -353,6 +414,7 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
           description: body.description === undefined ? undefined : parseDescription(body.description),
           inNav: body.inNav === undefined ? undefined : body.inNav === true,
           blocks: parseBlocks(body.blocks),
+          published: body.published === undefined ? undefined : body.published === true,
         }, c.get("user").name),
       );
     } catch (err) {
@@ -383,7 +445,8 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
   // Every other page of the site. Registered last so it cannot shadow the routes above.
   app.get("/:slug{[a-z0-9-]+}", (c) => {
     const page = pages.get(c.req.param("slug"));
-    return page ? c.html(renderPage(page, siteContext(c))) : c.html(renderNotFound(siteContext(c)), 404);
+    // Posts live under /blog only.
+    return page?.kind === "page" ? c.html(renderPage(page, siteContext(c))) : c.html(renderNotFound(siteContext(c)), 404);
   });
 
   app.notFound((c) => c.html(renderNotFound(siteContext(c)), 404));

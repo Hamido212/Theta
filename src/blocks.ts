@@ -24,8 +24,12 @@ export type Block =
   | DividerBlock;
 export type BlockType = Block["type"];
 
+export type PageKind = "page" | "post";
+
 export type Page = {
   slug: string;
+  // Pages form the site structure; posts are dated blog entries under /blog.
+  kind: PageKind;
   title: string;
   // Short summary for search engines and link previews.
   description: string;
@@ -33,24 +37,43 @@ export type Page = {
   inNav: boolean;
   blocks: Block[];
   updatedAt: string;
+  // Posts only: when it went public; null while it is a draft.
+  publishedAt: string | null;
 };
 
 // Slug of the start page, served at "/".
 export const HOME = "home";
 
+export const BLOG = "blog";
+
 export const publicPath = (slug: string) => (slug === HOME ? "/" : `/${slug}`);
 export const editPath = (slug: string) => (slug === HOME ? "/edit" : `/edit/${slug}`);
+export const pagePath = (page: Pick<Page, "slug" | "kind">) =>
+  page.kind === "post" ? `/${BLOG}/${page.slug}` : publicPath(page.slug);
 
 // A saved state of a page in its history.
 export type RevisionSummary = { id: number; title: string; author: string; createdAt: string };
 export type Revision = RevisionSummary & Pick<Page, "description" | "inNav" | "blocks">;
+
+// "30. September 2026"
+export const formatDate = (iso: string) => new Date(iso).toLocaleDateString("de-DE", { dateStyle: "long" });
+
+const excerptLength = 220;
+
+// A short teaser: the description, or else the start of the first text.
+export function excerpt(page: Page): string {
+  if (page.description) return page.description;
+  const text = page.blocks.find((block) => block.type === "text")?.text.replace(/\s+/g, " ").trim() ?? "";
+  return text.length > excerptLength ? `${text.slice(0, excerptLength).replace(/\s+\S*$/, "")} …` : text;
+}
 
 export type SiteSettings = {
   name: string;
   description: string;
 };
 
-export type NavItem = { slug: string; title: string };
+// href overrides the address for entries that are not pages, such as the blog.
+export type NavItem = { slug: string; title: string; href?: string };
 
 // Size and responsive sources of an uploaded image, used for srcset and to avoid layout jumps.
 export type ImageInfo = { width: number; height: number; srcset: string };

@@ -5,10 +5,12 @@ import { paragraphs } from "../src/theme/fields";
 
 const page: Page = {
   slug: "ueber-uns",
+  kind: "page",
   title: "Über uns",
   description: "Wer wir sind",
   inNav: true,
   updatedAt: "2026-09-30T12:00:00.000Z",
+  publishedAt: null,
   blocks: [
     { id: "h", type: "heading", text: "Hallo <Welt>" },
     { id: "t", type: "text", text: "Erster Absatz\nzweite Zeile\n\nZweiter Absatz" },
