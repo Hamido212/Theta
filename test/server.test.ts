@@ -34,7 +34,9 @@ test("invalid blocks are rejected with a readable error and nothing is saved", a
   const before = pages.get("home");
   const res = await put({ blocks: [{ id: "a", type: "image", src: "javascript:alert(1)", alt: "" }] });
   expect(res.status).toBe(400);
-  expect(((await res.json()) as { error: string }).error).toContain("src");
+  const body = (await res.json()) as { error: string; block: number };
+  expect(body.error).toBe("Block 1 (Bild): Die Bild-Adresse muss mit https://, http:// oder / beginnen");
+  expect(body.block).toBe(0);
   expect(pages.get("home")).toEqual(before);
 });
 

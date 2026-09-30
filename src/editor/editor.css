@@ -69,6 +69,73 @@
   outline-color: color-mix(in srgb, var(--t-color-accent) 45%, transparent);
 }
 
+.theta-block.theta-selected {
+  outline-style: solid;
+  outline-color: color-mix(in srgb, var(--t-color-accent) 70%, transparent);
+}
+
+.theta-block.theta-block-error {
+  outline: 2px solid #dc2626;
+}
+
+/* Where a dragged block would land. */
+.theta-drop-before {
+  box-shadow: 0 -10px 0 -6px var(--t-color-accent);
+}
+
+.theta-drop-after {
+  box-shadow: 0 10px 0 -6px var(--t-color-accent);
+}
+
+.theta-handle {
+  padding: 0.2rem 0.3rem;
+  color: var(--t-color-muted);
+  cursor: grab;
+  user-select: none;
+}
+
+.theta-insert {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--t-space) * -0.5 - 0.8rem);
+  z-index: 5;
+  display: none;
+  width: 1.6rem;
+  height: 1.6rem;
+  padding: 0;
+  translate: -50% 0;
+  border: 1px solid var(--t-color-accent);
+  border-radius: 50%;
+  background: var(--t-color-bg);
+  color: var(--t-color-accent);
+  font: 600 1rem/1 var(--t-font-body);
+  cursor: pointer;
+}
+
+.theta-block:hover > .theta-insert,
+.theta-block.theta-selected > .theta-insert {
+  display: block;
+}
+
+.theta-add-menu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 1.4rem;
+  padding: 0.6rem;
+  border-radius: 12px;
+  background: var(--t-color-bg);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.15);
+  font: 0.9rem/1.2 var(--t-font-body);
+}
+
+.theta-add .theta-add-menu {
+  margin: 0;
+  padding: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
 .theta-controls {
   position: absolute;
   top: -2.4rem;
@@ -84,8 +151,9 @@
   background: var(--t-color-bg);
 }
 
-.theta-block:hover .theta-controls,
-.theta-block:focus-within .theta-controls {
+.theta-block:hover > .theta-controls,
+.theta-block:focus-within > .theta-controls,
+.theta-block.theta-selected > .theta-controls {
   display: flex;
 }
 

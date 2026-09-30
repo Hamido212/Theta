@@ -429,7 +429,7 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
         }, c.get("user").name),
       );
     } catch (err) {
-      if (err instanceof ValidationError) return c.json({ error: err.message }, 400);
+      if (err instanceof ValidationError) return c.json({ error: err.message, block: err.block }, 400);
       throw err;
     }
   });

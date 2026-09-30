@@ -17,6 +17,8 @@ Danach zeigt http://localhost:3000 die Website. Beim ersten Start gibt Theta im 
 
 Im Editor klickst du auf einen Text und schreibst los. Mit den Knöpfen oben (oder Strg+B, Strg+I, Strg+K) wird markierter Text fett, kursiv oder zum Link, und aus Zeilen werden Aufzählungen oder nummerierte Listen. Gespeichert wird dabei kein HTML, sondern ein kleines, sicheres Textformat (`**fett**`, `*kursiv*`, `[Link](/adresse)`, `- Liste`), das auch im Export und in der Datenbank lesbar bleibt. Gespeichert wird mit dem Knopf oder mit Strg+S (⌘+S).
 
+Ein Klick auf einen Block wählt ihn aus. Dann erscheinen seine Einstellungen, und über das „+“ an seiner Unterkante fügst du direkt dahinter einen neuen Block ein. Am Griff ⠿ ziehst du Blöcke an eine andere Stelle, mit ⧉ verdoppelst du sie. Lässt sich eine Seite nicht speichern, springt der Editor zum betroffenen Block, markiert ihn und sagt, was fehlt.
+
 Passwort vergessen? `bun run theta reset-password deine@adresse.de` setzt ein neues, zufälliges Passwort und zeigt es an.
 
 ## Was der Prototyp zeigt
