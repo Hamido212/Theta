@@ -227,6 +227,13 @@ h1 {
   font-size: 0.875rem;
 }
 
+.a-draft {
+  padding: 0.05rem 0.45rem;
+  border-radius: 6px;
+  background: color-mix(in srgb, #d97706 14%, transparent);
+  color: #b45309;
+}
+
 .a-delete summary {
   font-size: 0.9rem;
   color: var(--a-error);
@@ -406,4 +413,11 @@ select {
   border: 1px solid var(--a-border);
   border-radius: 12px;
   background: #fff;
+}
+
+@media (prefers-color-scheme: dark) {
+  .a-draft,
+  .a-warning {
+    color: #fbbf24;
+  }
 }

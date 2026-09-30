@@ -1,9 +1,11 @@
 import type { Database } from "bun:sqlite";
 import {
+  BLOG,
   type Block,
   HOME,
   type NavItem,
   type Page,
+  type PageKind,
   type Revision,
   type RevisionSummary,
   type SiteSettings,
@@ -14,12 +16,16 @@ import { type ThemeSettings, defaultTheme, parseTheme } from "./theme/tokens";
 
 type PageRow = {
   slug: string;
+  kind: string;
   title: string;
   description: string;
   in_nav: number;
   blocks: string;
   updated_at: string;
+  published_at: string | null;
 };
+
+const PAGE_COLUMNS = "slug, kind, title, description, in_nav, blocks, updated_at, published_at";
 
 // How many saved versions of each page are kept.
 const MAX_REVISIONS = 50;
@@ -27,7 +33,21 @@ const MAX_REVISIONS = 50;
 type RevisionRow = { id: number; title: string; description: string; in_nav: number; blocks: string; author: string; created_at: string };
 
 // Paths the app itself uses; pages cannot take them.
-const RESERVED_SLUGS = new Set([HOME, "admin", "api", "assets", "edit", "login", "logout", "media", "setup", "sitemap.xml", "robots.txt"]);
+const RESERVED_SLUGS = new Set([
+  HOME,
+  BLOG,
+  "admin",
+  "api",
+  "assets",
+  "edit",
+  "feed.xml",
+  "login",
+  "logout",
+  "media",
+  "setup",
+  "sitemap.xml",
+  "robots.txt",
+]);
 
 export class PageStore {
   constructor(private db: Database) {
@@ -35,54 +55,91 @@ export class PageStore {
   }
 
   get(slug: string): Page | null {
-    const row = this.db
-      .query<PageRow, [string]>("SELECT slug, title, description, in_nav, blocks, updated_at FROM pages WHERE slug = ?")
-      .get(slug);
+    const row = this.db.query<PageRow, [string]>(`SELECT ${PAGE_COLUMNS} FROM pages WHERE slug = ?`).get(slug);
     return row ? toPage(row) : null;
   }
 
-  // All pages, home first, then in navigation order.
+  // A published post, or null for drafts and pages.
+  post(slug: string): Page | null {
+    const page = this.get(slug);
+    return page?.kind === "post" && page.publishedAt ? page : null;
+  }
+
+  // All pages (not posts), home first, then in navigation order.
   list(): Page[] {
     return this.db
+      .query<PageRow, []>(`SELECT ${PAGE_COLUMNS} FROM pages WHERE kind = 'page' ORDER BY slug != 'home', position, title`)
+      .all()
+      .map(toPage);
+  }
+
+  // Blog posts, newest first. Drafts come first when they are included.
+  posts({ drafts = false } = {}): Page[] {
+    return this.db
       .query<PageRow, []>(
-        `SELECT slug, title, description, in_nav, blocks, updated_at FROM pages
-         ORDER BY slug != 'home', position, title`,
+        `SELECT ${PAGE_COLUMNS} FROM pages WHERE kind = 'post' ${drafts ? "" : "AND published_at IS NOT NULL"}
+         ORDER BY published_at IS NOT NULL, published_at DESC, updated_at DESC`,
       )
       .all()
       .map(toPage);
   }
 
-  nav(): NavItem[] {
-    return this.list()
-      .filter((page) => page.slug !== HOME && page.inNav)
-      .map(({ slug, title }) => ({ slug, title }));
+  // Every page and post, e.g. to find the media they use.
+  all(): Page[] {
+    return [...this.list(), ...this.posts({ drafts: true })];
   }
 
-  // Creates a page from a title and returns it. The address is derived from the title.
-  create(title: string, author = ""): Page {
+  nav(): NavItem[] {
+    const items: NavItem[] = this.list()
+      .filter((page) => page.slug !== HOME && page.inNav)
+      .map(({ slug, title }) => ({ slug, title }));
+    // The blog shows up in the menu as soon as there is something to read.
+    const hasPosts = this.db.query("SELECT 1 FROM pages WHERE kind = 'post' AND published_at IS NOT NULL LIMIT 1").get();
+    if (hasPosts) items.push({ slug: BLOG, title: "Blog", href: `/${BLOG}` });
+    return items;
+  }
+
+  // Creates a page or post from a title and returns it. The address is derived from the title.
+  create(title: string, author = "", kind: PageKind = "page"): Page {
     const cleanTitle = parseTitle(title);
     const base = slugify(cleanTitle);
     let slug = base;
     for (let n = 2; RESERVED_SLUGS.has(slug) || this.get(slug); n++) slug = `${base}-${n}`;
 
     const { next } = this.db.query<{ next: number }, []>("SELECT COALESCE(MAX(position), 0) + 1 AS next FROM pages").get()!;
-    this.insert(slug, { title: cleanTitle, blocks: [{ id: crypto.randomUUID(), type: "heading", text: cleanTitle }] }, next);
+    const blocks: Block[] = [{ id: crypto.randomUUID(), type: "heading", text: cleanTitle }];
+    if (kind === "post") blocks.push({ id: crypto.randomUUID(), type: "text", text: "" });
+    this.insert(slug, { title: cleanTitle, blocks, kind }, next);
     const page = this.get(slug)!;
     this.recordRevision(page, author);
     return page;
   }
 
-  save(slug: string, changes: { title?: string; description?: string; inNav?: boolean; blocks?: Block[] }, author = ""): Page {
+  save(
+    slug: string,
+    changes: { title?: string; description?: string; inNav?: boolean; blocks?: Block[]; published?: boolean },
+    author = "",
+  ): Page {
     const page = this.get(slug);
     if (!page) throw new ValidationError("Seite nicht gefunden");
-    const defined = Object.fromEntries(Object.entries(changes).filter(([, value]) => value !== undefined));
+    const { published, ...rest } = changes;
+    const defined = Object.fromEntries(Object.entries(rest).filter(([, value]) => value !== undefined));
     const next = { ...page, ...defined };
+    const publishedAt = page.kind === "post" && published !== undefined ? publicationDate(page, published) : page.publishedAt;
     this.db
-      .query("UPDATE pages SET title = ?, description = ?, in_nav = ?, blocks = ?, updated_at = ? WHERE slug = ?")
-      .run(next.title, next.description, next.inNav ? 1 : 0, JSON.stringify(next.blocks), new Date().toISOString(), slug);
+      .query("UPDATE pages SET title = ?, description = ?, in_nav = ?, blocks = ?, updated_at = ?, published_at = ? WHERE slug = ?")
+      .run(next.title, next.description, next.inNav ? 1 : 0, JSON.stringify(next.blocks), new Date().toISOString(), publishedAt, slug);
     const saved = this.get(slug)!;
     this.recordRevision(saved, author);
     return saved;
+  }
+
+  // Publishes a post or takes it back to a draft, without touching its content or history.
+  publish(slug: string, published: boolean): Page {
+    const page = this.get(slug);
+    if (page?.kind !== "post") throw new ValidationError("Beitrag nicht gefunden");
+    this.db.query("UPDATE pages SET published_at = ? WHERE slug = ?").run(publicationDate(page, published), slug);
+    return this.get(slug)!;
   }
 
   // Saved versions of a page, newest first.
@@ -140,10 +197,11 @@ export class PageStore {
     })();
   }
 
-  private insert(slug: string, page: { title: string; blocks: Block[] }, position: number) {
+  private insert(slug: string, page: { title: string; blocks: Block[]; kind?: PageKind }, position: number) {
+    const kind = page.kind ?? "page";
     this.db
-      .query("INSERT INTO pages (slug, title, description, in_nav, position, blocks, updated_at) VALUES (?, ?, '', 1, ?, ?, ?)")
-      .run(slug, page.title, position, JSON.stringify(page.blocks), new Date().toISOString());
+      .query("INSERT INTO pages (slug, kind, title, description, in_nav, position, blocks, updated_at) VALUES (?, ?, ?, '', ?, ?, ?, ?)")
+      .run(slug, kind, page.title, kind === "page" ? 1 : 0, position, JSON.stringify(page.blocks), new Date().toISOString());
   }
 }
 
@@ -223,14 +281,21 @@ export function slugify(title: string): string {
   return slug || "seite";
 }
 
+// Publishing keeps the date a post first went public; taking it back to a draft clears it.
+function publicationDate(page: Page, published: boolean): string | null {
+  return published ? (page.publishedAt ?? new Date().toISOString()) : null;
+}
+
 function toPage(row: PageRow): Page {
   return {
     slug: row.slug,
+    kind: row.kind === "post" ? "post" : "page",
     title: row.title,
     description: row.description,
     inNav: row.in_nav === 1,
     blocks: parseBlocks(JSON.parse(row.blocks)),
     updatedAt: row.updated_at,
+    publishedAt: row.published_at,
   };
 }
 

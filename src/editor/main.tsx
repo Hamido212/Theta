@@ -1,6 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { type Block, type BlockType, HOME, type Page, type Revision, blockLabels, editPath, newBlock, publicPath } from "../blocks";
+import {
+  BLOG,
+  type Block,
+  type BlockType,
+  HOME,
+  type Page,
+  type Revision,
+  blockLabels,
+  editPath,
+  formatDate,
+  newBlock,
+  pagePath,
+} from "../blocks";
 import type { EditorData } from "../render";
 import { BlockView } from "../theme/blocks";
 import { SiteFrame } from "../theme/layout";
@@ -8,7 +20,7 @@ import { HistoryPanel } from "./history";
 import { BlockSettings } from "./settings";
 
 type SaveState = "saved" | "dirty" | "saving" | "error";
-type PageMeta = Pick<Page, "title" | "description" | "inNav">;
+type PageMeta = Pick<Page, "title" | "description" | "inNav"> & { published: boolean };
 
 const saveLabels: Record<SaveState, string> = {
   saved: "Gespeichert",
@@ -19,7 +31,15 @@ const saveLabels: Record<SaveState, string> = {
 
 function Editor({ page, site, nav, pages }: EditorData) {
   const [blocks, setBlocks] = useState(page.blocks);
-  const [meta, setMeta] = useState<PageMeta>({ title: page.title, description: page.description, inNav: page.inNav });
+  const post = page.kind === "post";
+  const [meta, setMeta] = useState<PageMeta>({
+    title: page.title,
+    description: page.description,
+    inNav: page.inNav,
+    published: page.publishedAt !== null,
+  });
+  // When the saved post went public; null for drafts. Only published pages can be viewed.
+  const [publishedAt, setPublishedAt] = useState(page.publishedAt);
   const [panel, setPanel] = useState<"settings" | "history" | null>(null);
   const [notice, setNotice] = useState("");
   const [state, setState] = useState<SaveState>("saved");
@@ -58,7 +78,7 @@ function Editor({ page, site, nav, pages }: EditorData) {
 
   const loadRevision = (revision: Revision) => {
     setBlocks(revision.blocks);
-    setMeta({ title: revision.title, description: revision.description, inNav: revision.inNav });
+    setMeta((current) => ({ ...current, title: revision.title, description: revision.description, inNav: revision.inNav }));
     touch();
     setPanel(null);
     const when = new Date(revision.createdAt).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" });
@@ -78,6 +98,7 @@ function Editor({ page, site, nav, pages }: EditorData) {
         body: JSON.stringify({ ...meta, blocks }),
       });
       if (!res.ok) throw new Error(((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? res.statusText);
+      setPublishedAt(((await res.json()) as Page).publishedAt);
       setError("");
       setNotice("");
       setState(version.current === saving ? "saved" : "dirty");
@@ -109,7 +130,7 @@ function Editor({ page, site, nav, pages }: EditorData) {
   return (
     <>
       <header className="theta-bar">
-        <a className="theta-logo" href="/admin">
+        <a className="theta-logo" href={post ? "/admin/blog" : "/admin"}>
           θ Übersicht
         </a>
         <span className={`theta-status theta-status-${state}`} title={error || undefined}>
@@ -120,11 +141,13 @@ function Editor({ page, site, nav, pages }: EditorData) {
           Verlauf
         </button>
         <button className="theta-button" onClick={() => togglePanel("settings")} aria-expanded={panel === "settings"}>
-          Seiteneinstellungen
+          {post ? "Beitragseinstellungen" : "Seiteneinstellungen"}
         </button>
-        <a className="theta-button" href={publicPath(page.slug)} target="_blank" rel="noopener">
-          Ansehen
-        </a>
+        {(!post || publishedAt) && (
+          <a className="theta-button" href={pagePath(page)} target="_blank" rel="noopener">
+            Ansehen
+          </a>
+        )}
         <button className="theta-button theta-primary" onClick={save} disabled={state === "saving" || state === "saved"}>
           Speichern
         </button>
@@ -135,11 +158,16 @@ function Editor({ page, site, nav, pages }: EditorData) {
         </form>
       </header>
 
-      {panel === "settings" && <PageSettings slug={page.slug} meta={meta} onChange={changeMeta} />}
+      {panel === "settings" && <PageSettings page={page} meta={meta} onChange={changeMeta} />}
       {panel === "history" && <HistoryPanel slug={page.slug} onLoad={loadRevision} />}
       {notice && <p className="theta-notice">{notice}</p>}
 
-      <SiteFrame site={site} nav={nav} current={page.slug} linkTo={editPath}>
+      <SiteFrame site={site} nav={nav} current={post ? BLOG : page.slug} linkTo={editPath}>
+        {post && (
+          <p className="t-post-meta">
+            {meta.published ? formatDate(publishedAt ?? new Date().toISOString()) : "Entwurf, noch nicht veröffentlicht"}
+          </p>
+        )}
         {blocks.map((block, index) => (
           <section key={block.id} className="theta-block" aria-label={blockLabels[block.type]}>
             <div className="theta-controls">
@@ -171,7 +199,9 @@ function Editor({ page, site, nav, pages }: EditorData) {
   );
 }
 
-function PageSettings({ slug, meta, onChange }: { slug: string; meta: PageMeta; onChange: (patch: Partial<PageMeta>) => void }) {
+type PageSettingsProps = { page: Page; meta: PageMeta; onChange: (patch: Partial<PageMeta>) => void };
+
+function PageSettings({ page, meta, onChange }: PageSettingsProps) {
   const length = meta.description.length;
   return (
     <div className="theta-panel">
@@ -185,20 +215,31 @@ function PageSettings({ slug, meta, onChange }: { slug: string; meta: PageMeta; 
           value={meta.description}
           maxLength={300}
           rows={2}
-          placeholder="Worum geht es auf dieser Seite? Ein bis zwei Sätze."
+          placeholder={
+            page.kind === "post"
+              ? "Worum geht es in diesem Beitrag? Erscheint auch als Vorschau im Blog."
+              : "Worum geht es auf dieser Seite? Ein bis zwei Sätze."
+          }
           onChange={(e) => onChange({ description: e.target.value })}
         />
         <small className={length > 160 ? "theta-hint" : undefined}>
           {length} Zeichen{length > 160 && ", Google zeigt meist nur rund 160 an"}
         </small>
       </label>
-      {slug !== HOME && (
+      {page.kind === "post" ? (
         <label className="theta-check">
-          <input type="checkbox" checked={meta.inNav} onChange={(e) => onChange({ inNav: e.target.checked })} />
-          Im Menü anzeigen
+          <input type="checkbox" checked={meta.published} onChange={(e) => onChange({ published: e.target.checked })} />
+          Veröffentlicht (nach dem Speichern im Blog sichtbar)
         </label>
+      ) : (
+        page.slug !== HOME && (
+          <label className="theta-check">
+            <input type="checkbox" checked={meta.inNav} onChange={(e) => onChange({ inNav: e.target.checked })} />
+            Im Menü anzeigen
+          </label>
+        )
       )}
-      <p className="theta-panel-note">Adresse: {publicPath(slug)}</p>
+      <p className="theta-panel-note">Adresse: {pagePath(page)}</p>
     </div>
   );
 }

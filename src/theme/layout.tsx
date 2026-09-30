@@ -3,6 +3,7 @@ import { HOME, type NavItem, type SiteSettings } from "../blocks";
 
 // Header, navigation and footer around every page. Used on the public site and in the
 // editor; linkTo decides whether links lead to public pages or to their editor.
+// Entries with their own href, like the blog, always lead there.
 
 type SiteFrameProps = {
   site: SiteSettings;
@@ -24,7 +25,7 @@ export function SiteFrame({ site, nav, current, linkTo, children }: SiteFramePro
             <ul className="t-nav">
               {nav.map((item) => (
                 <li key={item.slug}>
-                  <a href={linkTo(item.slug)} aria-current={item.slug === current ? "page" : undefined}>
+                  <a href={item.href ?? linkTo(item.slug)} aria-current={item.slug === current ? "page" : undefined}>
                     {item.title}
                   </a>
                 </li>

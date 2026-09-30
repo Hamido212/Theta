@@ -104,7 +104,7 @@ function ButtonSettings({ block, onChange, pages }: Props<ButtonBlock>) {
         />
         <datalist id={listId}>
           {pages.map((page) => (
-            <option key={page.slug} value={publicPath(page.slug)}>
+            <option key={page.slug} value={page.href ?? publicPath(page.slug)}>
               {page.title}
             </option>
           ))}

@@ -28,8 +28,8 @@ Passwort vergessen? `bun run theta reset-password deine@adresse.de` setzt ein ne
 - **Schnell ab Werk.** Die öffentliche Seite ist reines HTML und CSS, ganz ohne JavaScript.
 - **Bilder ohne Vorarbeit.** Hochgeladene Fotos dreht Theta richtig herum, entfernt Metadaten wie den Aufnahmeort, verkleinert sie auf höchstens 2560 Pixel und erzeugt kleinere WebP-Versionen. Besucher bekommen automatisch die passende Größe.
 - **Barrierefreiheit im Blick.** Fehlt einem Bild die Beschreibung, weist der Editor darauf hin.
-
 - **Gefunden werden.** Jede Seite hat Titel und Beschreibung für Suchmaschinen, eine kanonische Adresse und Vorschau-Daten für geteilte Links. `sitemap.xml` und `robots.txt` erzeugt Theta automatisch.
+- **Blog eingebaut.** Unter `/admin/blog` legst du Beiträge an und schreibst sie im selben Editor wie Seiten. Neue Beiträge bleiben Entwürfe, bis du sie veröffentlichst. Dann erscheinen sie mit Datum unter `/blog`, „Blog“ taucht im Menü auf, und Leser können über `/blog/feed.xml` (RSS) folgen. Der Blog ist auch im statischen Export enthalten.
 
 Blöcke: Überschrift, Text, Bild, Galerie, Button, Spalten, Video, Zitat und Trenner. Videos von YouTube oder Vimeo laden erst, wenn jemand auf Abspielen klickt; vorher werden keine Daten an die Plattform übertragen.
 
@@ -39,13 +39,13 @@ Blöcke: Überschrift, Text, Bild, Galerie, Button, Spalten, Video, Zitat und Tr
 |---|---|
 | `src/blocks.ts` | Datenmodell der Blöcke und Prüfung aller Eingaben |
 | `src/db.ts` | SQLite-Datenbank und Schema-Migrationen |
-| `src/store.ts` | Speicherung der Seiten |
+| `src/store.ts` | Speicherung der Seiten, Blog-Beiträge und Einstellungen |
 | `src/auth.ts` | Konten, Passwörter und Anmeldungen |
 | `src/media.ts` | Hochgeladene Bilder: Prüfung, Optimierung, kleinere Versionen |
 | `src/export.ts`, `src/zip.ts` | Export der Website als statische Dateien bzw. ZIP |
-| `src/admin/` | Übersicht, Anmelde- und Einrichtungsseiten |
+| `src/admin/` | Verwaltung (Seiten, Blog, Mediathek, Design), Anmelde- und Einrichtungsseiten |
 | `src/theme/` | Das Theme: Kopfzeile mit Menü, Block-Komponenten, CSS und Design-Tokens (`tokens.ts`) |
-| `src/render.tsx` | Rendert die öffentliche Seite und die Editor-Seite auf dem Server |
+| `src/render.tsx` | Rendert öffentliche Seiten, Blog, RSS-Feed, Sitemap und die Editor-Seite auf dem Server |
 | `src/editor/` | Der Editor im Browser (React) |
 | `src/server.ts` | HTTP-Server mit Hono |
 

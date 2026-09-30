@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { User } from "../auth";
-import { HOME, type Page, type SiteSettings, editPath, publicPath } from "../blocks";
+import { HOME, type Page, type SiteSettings, editPath, formatDate, pagePath, publicPath } from "../blocks";
 import type { MediaItem } from "../media";
 import { FONTS, PRESETS, type PresetId, RADIUS, SCHEMES, SPACING, type ThemeSettings, WIDTH, accentWarnings } from "../theme/tokens";
 
@@ -105,13 +105,16 @@ export function renderSetupLocked() {
   );
 }
 
-function AdminBar({ user, current }: { user: User; current: "pages" | "media" | "design" }) {
+function AdminBar({ user, current }: { user: User; current: "pages" | "blog" | "media" | "design" }) {
   return (
     <header className="a-bar">
       <strong>θ Theta</strong>
       <nav className="a-tabs" aria-label="Verwaltung">
         <a href="/admin" aria-current={current === "pages" ? "page" : undefined}>
           Seiten
+        </a>
+        <a href="/admin/blog" aria-current={current === "blog" ? "page" : undefined}>
+          Blog
         </a>
         <a href="/admin/media" aria-current={current === "media" ? "page" : undefined}>
           Mediathek
@@ -222,6 +225,75 @@ export function renderDashboard({ user, pages, site, origin, error }: DashboardP
               <button className="a-primary">ZIP herunterladen</button>
             </form>
             <p className="a-muted">Die Adresse wird für Suchmaschinen und Link-Vorschauen gebraucht.</p>
+          </section>
+        </main>
+      </body>
+    </html>,
+  );
+}
+
+type BlogProps = { user: User; posts: Page[]; error?: string };
+
+export function renderBlog({ user, posts, error }: BlogProps) {
+  return html(
+    <html lang="de">
+      <AdminHead title="Blog" />
+      <body>
+        <AdminBar user={user} current="blog" />
+
+        <main className="a-main">
+          <ErrorMessage error={error} />
+
+          <section className="a-section">
+            <h2>Beiträge</h2>
+            {posts.length === 0 ? (
+              <p className="a-muted">
+                Noch keine Beiträge. Ein neuer Beitrag bleibt ein Entwurf, bis du ihn veröffentlichst. Sobald einer
+                veröffentlicht ist, erscheint „Blog“ im Menü deiner Website.
+              </p>
+            ) : (
+              <ul className="a-list">
+                {posts.map((post) => (
+                  <li key={post.slug}>
+                    <div className="a-grow">
+                      <a href={editPath(post.slug)} className="a-title">
+                        {post.title}
+                      </a>
+                      <span className="a-muted">
+                        {post.publishedAt ? (
+                          <>
+                            Veröffentlicht am {formatDate(post.publishedAt)} ·{" "}
+                            <a href={pagePath(post)} target="_blank" rel="noopener">
+                              {pagePath(post)}
+                            </a>
+                          </>
+                        ) : (
+                          <span className="a-draft">Entwurf</span>
+                        )}
+                      </span>
+                    </div>
+                    <form method="post" action={`/admin/blog/${post.slug}/publish`}>
+                      <button name="published" value={post.publishedAt ? "0" : "1"}>
+                        {post.publishedAt ? "Zurück zu Entwurf" : "Veröffentlichen"}
+                      </button>
+                    </form>
+                    <details className="a-delete">
+                      <summary>Löschen</summary>
+                      <form method="post" action={`/admin/blog/${post.slug}/delete`}>
+                        <button className="a-danger">„{post.title}“ endgültig löschen</button>
+                      </form>
+                    </details>
+                    <a className="a-button" href={editPath(post.slug)}>
+                      Bearbeiten
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <form method="post" action="/admin/blog" className="a-inline">
+              <input name="title" placeholder="Titel des Beitrags" required maxLength={200} aria-label="Titel des neuen Beitrags" />
+              <button className="a-primary">Beitrag anlegen</button>
+            </form>
           </section>
         </main>
       </body>

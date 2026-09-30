@@ -1,8 +1,8 @@
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { HOME } from "./blocks";
+import { BLOG, HOME } from "./blocks";
 import { builtinMedia, type MediaStore } from "./media";
-import { type SiteContext, renderNotFound, renderPage, renderRobots, renderSitemap } from "./render";
+import { type SiteContext, renderBlogIndex, renderFeed, renderNotFound, renderPage, renderRobots, renderSitemap } from "./render";
 import type { PageStore, SettingsStore } from "./store";
 import { themeCss } from "./theme/tokens";
 
@@ -15,6 +15,7 @@ export async function exportSite({ pages, settings, media }: Stores, origin: str
   const encoder = new TextEncoder();
   const files = new Map<string, Uint8Array>();
   const all = pages.list();
+  const posts = pages.posts();
   const context: SiteContext = {
     site: settings.site(),
     nav: pages.nav(),
@@ -26,8 +27,13 @@ export async function exportSite({ pages, settings, media }: Stores, origin: str
   for (const page of all) {
     files.set(page.slug === HOME ? "index.html" : `${page.slug}/index.html`, encoder.encode(renderPage(page, context)));
   }
+  if (posts.length > 0) {
+    for (const post of posts) files.set(`${BLOG}/${post.slug}/index.html`, encoder.encode(renderPage(post, context)));
+    files.set(`${BLOG}/index.html`, encoder.encode(renderBlogIndex(posts, context)));
+    files.set(`${BLOG}/feed.xml`, encoder.encode(renderFeed(posts, context.site, origin)));
+  }
   files.set("404.html", encoder.encode(renderNotFound(context)));
-  files.set("sitemap.xml", encoder.encode(renderSitemap(all, origin)));
+  files.set("sitemap.xml", encoder.encode(renderSitemap([...all, ...posts], origin)));
   files.set("robots.txt", encoder.encode(renderRobots(origin)));
   files.set("assets/theme.css", await Bun.file(new URL("./theme/theme.css", import.meta.url)).bytes());
 
