@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { User } from "../auth";
 import { HOME, type Page, type SiteSettings, editPath, publicPath } from "../blocks";
 import type { MediaItem } from "../media";
+import { FONTS, PRESETS, type PresetId, RADIUS, SCHEMES, SPACING, type ThemeSettings, WIDTH, accentWarnings } from "../theme/tokens";
 
 // Server-rendered admin screens. They work without JavaScript: plain forms that post back.
 
@@ -104,7 +105,7 @@ export function renderSetupLocked() {
   );
 }
 
-function AdminBar({ user, current }: { user: User; current: "pages" | "media" }) {
+function AdminBar({ user, current }: { user: User; current: "pages" | "media" | "design" }) {
   return (
     <header className="a-bar">
       <strong>θ Theta</strong>
@@ -114,6 +115,9 @@ function AdminBar({ user, current }: { user: User; current: "pages" | "media" })
         </a>
         <a href="/admin/media" aria-current={current === "media" ? "page" : undefined}>
           Mediathek
+        </a>
+        <a href="/admin/design" aria-current={current === "design" ? "page" : undefined}>
+          Design
         </a>
       </nav>
       <a href="/" target="_blank" rel="noopener">
@@ -271,6 +275,99 @@ export function renderMediaLibrary({ user, items, usage, error }: MediaLibraryPr
                 })}
               </ul>
             )}
+          </section>
+        </main>
+      </body>
+    </html>,
+  );
+}
+
+function Choice<T extends Record<string, unknown>>({
+  name,
+  label,
+  options,
+  value,
+  text,
+}: {
+  name: string;
+  label: string;
+  options: T;
+  value: string;
+  text: (option: T[keyof T]) => string;
+}) {
+  return (
+    <label>
+      {label}
+      <select name={name} defaultValue={value}>
+        {Object.entries(options).map(([key, option]) => (
+          <option key={key} value={key}>
+            {text(option as T[keyof T])}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+export function renderDesign({ user, theme, error }: { user: User; theme: ThemeSettings; error?: string }) {
+  const warnings = accentWarnings(theme);
+  return html(
+    <html lang="de">
+      <AdminHead title="Design" />
+      <body>
+        <AdminBar user={user} current="design" />
+        <main className="a-main a-main-wide">
+          <ErrorMessage error={error} />
+
+          <section className="a-section">
+            <h2>Vorlage</h2>
+            <p className="a-muted">Eine Vorlage legt Farben und Schriften fest. Deine Inhalte bleiben beim Wechseln erhalten.</p>
+            <div className="a-presets">
+              {(Object.entries(PRESETS) as [PresetId, (typeof PRESETS)[PresetId]][]).map(([id, preset]) => (
+                <form key={id} method="post" action="/admin/design/preset" className="a-preset" aria-current={theme.preset === id ? "true" : undefined}>
+                  <input type="hidden" name="preset" value={id} />
+                  <div
+                    className="a-preset-sample"
+                    style={{ background: preset.light.bg, color: preset.light.text, fontFamily: FONTS[preset.defaults.fonts].heading }}
+                  >
+                    <span>Aa</span>
+                    <i style={{ background: preset.defaults.accent }} />
+                    <i style={{ background: preset.dark.bg }} />
+                  </div>
+                  <strong>{preset.label}</strong>
+                  <span className="a-muted">{preset.description}</span>
+                  <button disabled={theme.preset === id}>{theme.preset === id ? "Aktiv" : "Verwenden"}</button>
+                </form>
+              ))}
+            </div>
+          </section>
+
+          <section className="a-section">
+            <h2>Anpassen</h2>
+            <form method="post" action="/admin/design" className="a-form a-grid">
+              <input type="hidden" name="preset" value={theme.preset} />
+              <label>
+                Akzentfarbe (Buttons, Links, Hervorhebungen)
+                <input type="color" name="accent" defaultValue={theme.accent} />
+              </label>
+              <Choice name="fonts" label="Schrift" options={FONTS} value={theme.fonts} text={(o) => o.label} />
+              <Choice name="spacing" label="Abstände" options={SPACING} value={theme.spacing} text={(o) => o.label} />
+              <Choice name="radius" label="Ecken" options={RADIUS} value={theme.radius} text={(o) => o.label} />
+              <Choice name="width" label="Breite des Inhalts" options={WIDTH} value={theme.width} text={(o) => o.label} />
+              <Choice name="colorScheme" label="Hell oder dunkel" options={SCHEMES} value={theme.colorScheme} text={(o) => o} />
+              {warnings.map((warning) => (
+                <p key={warning} className="a-warning">
+                  {warning}
+                </p>
+              ))}
+              <button className="a-primary">Speichern</button>
+            </form>
+            <p className="a-muted">Schriften kommen vom Gerät der Besucher. Es werden keine Schriften von fremden Servern geladen.</p>
+          </section>
+
+          <section className="a-section">
+            <h2>Vorschau</h2>
+            <iframe className="a-preview" src="/" title="Vorschau der Startseite" />
           </section>
         </main>
       </body>

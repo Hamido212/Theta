@@ -4,13 +4,14 @@ import { type Context, Hono, type MiddlewareHandler } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { bodyLimit } from "hono/body-limit";
 import { csrf } from "hono/csrf";
-import { renderDashboard, renderLogin, renderMediaLibrary, renderSetup, renderSetupLocked } from "./admin/pages";
+import { renderDashboard, renderDesign, renderLogin, renderMediaLibrary, renderSetup, renderSetupLocked } from "./admin/pages";
 import { AuthError, AuthStore, type User } from "./auth";
 import { HOME, ValidationError, editPath, parseBlocks } from "./blocks";
 import { openDatabase } from "./db";
 import { MAX_UPLOAD_BYTES, type MediaItem, MediaStore } from "./media";
 import { type SiteContext, renderEditor, renderNotFound, renderPage, renderRobots, renderSitemap } from "./render";
 import { PageStore, SettingsStore, parseDescription, parseTitle } from "./store";
+import { type PresetId, PRESETS, defaultTheme, themeCss } from "./theme/tokens";
 
 const SESSION_COOKIE = "theta_session";
 
@@ -56,6 +57,7 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
     nav: pages.nav(),
     origin: publicUrl ? new URL(publicUrl).origin : new URL(c.req.url).origin,
     images: (src) => media.info(src),
+    themeCss: themeCss(settings.theme()),
   });
 
   // Rejects form posts from other sites, so nobody can act in the name of a logged-in user.
@@ -165,7 +167,7 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
     const page = pages.get(slug);
     if (!page) return c.html(renderNotFound(siteContext(c)), 404);
     const all = pages.list().map(({ slug, title }) => ({ slug, title }));
-    return c.html(renderEditor({ page, site: settings.site(), nav: pages.nav(), pages: all }));
+    return c.html(renderEditor({ page, site: settings.site(), nav: pages.nav(), pages: all }, themeCss(settings.theme())));
   };
   app.get("/edit", (c) => editor(c, HOME));
   app.get(`/edit/${HOME}`, (c) => c.redirect("/edit"));
@@ -258,6 +260,31 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
       return c.json(await upload(c), 201);
     } catch (err) {
       if (err instanceof ValidationError) return c.json({ error: err.message }, 400);
+      throw err;
+    }
+  });
+
+  // Design
+
+  const design = (c: Context<Env>, error?: string) =>
+    c.html(renderDesign({ user: c.get("user"), theme: settings.theme(), error }), error ? 400 : 200);
+
+  app.get("/admin/design", (c) => design(c));
+
+  // Choosing a preset starts over from its defaults.
+  app.post("/admin/design/preset", async (c) => {
+    const { preset } = await c.req.parseBody();
+    if (typeof preset !== "string" || !Object.hasOwn(PRESETS, preset)) return design(c, "Unbekannte Vorlage");
+    settings.saveTheme(defaultTheme(preset as PresetId));
+    return c.redirect("/admin/design");
+  });
+
+  app.post("/admin/design", async (c) => {
+    try {
+      settings.saveTheme(await c.req.parseBody());
+      return c.redirect("/admin/design");
+    } catch (err) {
+      if (err instanceof ValidationError) return design(c, err.message);
       throw err;
     }
   });

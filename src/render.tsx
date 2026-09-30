@@ -13,6 +13,8 @@ export type SiteContext = {
   origin: string;
   // Size and smaller copies of uploaded images.
   images?: ImageLookup;
+  // The site's design tokens as CSS (see src/theme/tokens.ts).
+  themeCss?: string;
 };
 
 // Data the browser editor starts with.
@@ -24,7 +26,9 @@ export type EditorData = {
   pages: NavItem[];
 };
 
-function Document({ title, head, children }: { title: string; head?: ReactNode; children: ReactNode }) {
+type DocumentProps = { title: string; themeCss?: string; head?: ReactNode; children: ReactNode };
+
+function Document({ title, themeCss, head, children }: DocumentProps) {
   return (
     <html lang="de">
       <head>
@@ -33,6 +37,7 @@ function Document({ title, head, children }: { title: string; head?: ReactNode; 
         <title>{title}</title>
         <link rel="icon" href="/media/favicon.svg" type="image/svg+xml" />
         <link rel="stylesheet" href="/assets/theme.css" />
+        {themeCss && <style dangerouslySetInnerHTML={{ __html: themeCss }} />}
         {head}
       </head>
       <body>{children}</body>
@@ -68,9 +73,9 @@ function SeoTags({ page, site, origin }: { page: Page; site: SiteSettings; origi
 }
 
 // Public page: plain HTML and CSS, no JavaScript at all.
-export function renderPage(page: Page, { site, nav, origin, images = () => null }: SiteContext): string {
+export function renderPage(page: Page, { site, nav, origin, images = () => null, themeCss }: SiteContext): string {
   return html(
-    <Document title={pageTitle(page, site)} head={<SeoTags page={page} site={site} origin={origin} />}>
+    <Document title={pageTitle(page, site)} themeCss={themeCss} head={<SeoTags page={page} site={site} origin={origin} />}>
       <ImageLookupContext.Provider value={images}>
         <SiteFrame site={site} nav={nav} current={page.slug} linkTo={publicPath}>
           {page.blocks.map((block) => (
@@ -82,9 +87,9 @@ export function renderPage(page: Page, { site, nav, origin, images = () => null 
   );
 }
 
-export function renderNotFound({ site, nav }: SiteContext): string {
+export function renderNotFound({ site, nav, themeCss }: SiteContext): string {
   return html(
-    <Document title={`Seite nicht gefunden · ${site.name}`} head={<meta name="robots" content="noindex" />}>
+    <Document title={`Seite nicht gefunden · ${site.name}`} themeCss={themeCss} head={<meta name="robots" content="noindex" />}>
       <SiteFrame site={site} nav={nav} current="" linkTo={publicPath}>
         <h1 className="t-heading">Seite nicht gefunden</h1>
         <div className="t-text">
@@ -98,12 +103,13 @@ export function renderNotFound({ site, nav }: SiteContext): string {
 }
 
 // Editor page: the same theme, plus the editor script that makes it editable in place.
-export function renderEditor(data: EditorData): string {
+export function renderEditor(data: EditorData, themeCss?: string): string {
   // Escape "<" so page content can never close the script tag early.
   const json = JSON.stringify(data).replace(/</g, "\\u003c");
   return html(
     <Document
       title={`${data.page.title} bearbeiten`}
+      themeCss={themeCss}
       head={
         <>
           <meta name="robots" content="noindex" />

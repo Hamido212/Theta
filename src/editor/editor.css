@@ -54,7 +54,7 @@
 .theta-primary {
   background: var(--t-color-accent);
   border-color: var(--t-color-accent);
-  color: var(--t-color-bg);
+  color: var(--t-color-on-accent, var(--t-color-bg));
 }
 
 .theta-block {
@@ -297,6 +297,6 @@
 
 .theta-dialog label.theta-button {
   display: inline-block;
-  color: var(--t-color-bg);
+  color: var(--t-color-on-accent, var(--t-color-bg));
   cursor: pointer;
 }

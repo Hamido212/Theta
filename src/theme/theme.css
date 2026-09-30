@@ -1,5 +1,6 @@
-/* Default theme. Everything visual is driven by these design tokens;
-   changing a site's look means changing tokens, never individual blocks. */
+/* Default theme. Everything visual is driven by design tokens; changing a site's look
+   means changing tokens, never individual blocks. The values below are fallbacks; the
+   server adds the site's own tokens (src/theme/tokens.ts) in a <style> tag. */
 :root {
   --t-color-bg: #fbfaf7;
   --t-color-text: #1d1b18;
@@ -59,6 +60,10 @@ body {
 
 .t-text p:last-child {
   margin-bottom: 0;
+}
+
+.t-text a {
+  color: var(--t-color-accent);
 }
 
 .t-image {
@@ -161,7 +166,7 @@ body {
   display: inline-block;
   padding: 0.7em 1.4em;
   border: 2px solid var(--t-color-accent);
-  border-radius: 999px;
+  border-radius: var(--t-radius-button, 999px);
   font-weight: 600;
   line-height: 1.2;
   text-decoration: none;
@@ -169,7 +174,7 @@ body {
 
 .t-button-primary {
   background: var(--t-color-accent);
-  color: var(--t-color-bg);
+  color: var(--t-color-on-accent, var(--t-color-bg));
 }
 
 .t-button-secondary {

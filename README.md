@@ -22,7 +22,7 @@ Passwort vergessen? `bun run theta reset-password deine@adresse.de` setzt ein ne
 ## Was der Prototyp zeigt
 
 - **Direkt auf der Seite bearbeiten.** Der Editor zeigt die Seite genau so, wie Besucher sie sehen. Texte ändert man an Ort und Stelle, Blöcke lassen sich hinzufügen, verschieben und löschen.
-- **Leitplanken statt Stil-Chaos.** Blöcke speichern nur Inhalt. Farben, Schriften und Abstände kommen aus den Design-Tokens des Themes (`src/theme/theme.css`), deshalb bleibt die Seite immer stimmig.
+- **Leitplanken statt Stil-Chaos.** Blöcke speichern nur Inhalt. Farben, Schriften und Abstände kommen aus Design-Tokens, deshalb bleibt die Seite immer stimmig. Unter `/admin/design` wählst du eine von drei Vorlagen (Klar, Modern, Warm) und passt Akzentfarbe, Schrift, Abstände, Ecken, Breite und Hell/Dunkel an. Theta warnt bei schlecht lesbaren Farben, wählt die Textfarbe auf Buttons selbst und hellt die Akzentfarbe im Dunkelmodus automatisch auf.
 - **Die Website ist ein Ordner.** Alle Inhalte liegen in einer SQLite-Datei (`theta.db`), hochgeladene Bilder im Ordner `uploads/` daneben. Kopieren heißt umziehen.
 - **Schnell ab Werk.** Die öffentliche Seite ist reines HTML und CSS, ganz ohne JavaScript.
 - **Bilder ohne Vorarbeit.** Hochgeladene Fotos dreht Theta richtig herum, entfernt Metadaten wie den Aufnahmeort, verkleinert sie auf höchstens 2560 Pixel und erzeugt kleinere WebP-Versionen. Besucher bekommen automatisch die passende Größe.
@@ -42,7 +42,7 @@ Blöcke: Überschrift, Text, Bild, Galerie, Button, Spalten, Video, Zitat und Tr
 | `src/auth.ts` | Konten, Passwörter und Anmeldungen |
 | `src/media.ts` | Hochgeladene Bilder: Prüfung, Optimierung, kleinere Versionen |
 | `src/admin/` | Übersicht, Anmelde- und Einrichtungsseiten |
-| `src/theme/` | Das Standard-Theme: Kopfzeile mit Menü, Block-Komponenten und Design-Tokens |
+| `src/theme/` | Das Theme: Kopfzeile mit Menü, Block-Komponenten, CSS und Design-Tokens (`tokens.ts`) |
 | `src/render.tsx` | Rendert die öffentliche Seite und die Editor-Seite auf dem Server |
 | `src/editor/` | Der Editor im Browser (React) |
 | `src/server.ts` | HTTP-Server mit Hono |
