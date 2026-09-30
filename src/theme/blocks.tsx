@@ -65,7 +65,7 @@ function Image({ block, edit }: BlockProps<ImageBlock>) {
   if (!block.src) return edit ? <Empty>Noch kein Bild ausgewählt</Empty> : null;
   return (
     <figure className={`t-image t-width-${block.width}`}>
-      <Img src={block.src} alt={block.alt} sizes={imageSizes[block.width]} />
+      <Img src={block.src} alt={block.alt} focal={block.focal} sizes={imageSizes[block.width]} />
       {(edit || block.caption.trim()) && (
         <figcaption>
           <TextField value={block.caption} onChange={edit && ((caption) => edit({ caption }))} placeholder="Bildunterschrift (optional)" />
@@ -82,7 +82,7 @@ function Gallery({ block, edit }: BlockProps<GalleryBlock>) {
     <ul className={block.crop ? "t-gallery t-gallery-crop" : "t-gallery"} style={{ "--t-gallery-columns": block.columns } as CSSProperties}>
       {images.map((image, i) => (
         <li key={i}>
-          <Img src={image.src} alt={image.alt} sizes={`(min-width: 44rem) ${Math.ceil(42 / block.columns)}rem, ${Math.ceil(100 / Math.min(block.columns, 2))}vw`} />
+          <Img src={image.src} alt={image.alt} focal={image.focal} sizes={`(min-width: 44rem) ${Math.ceil(42 / block.columns)}rem, ${Math.ceil(100 / Math.min(block.columns, 2))}vw`} />
         </li>
       ))}
     </ul>
@@ -119,7 +119,7 @@ function Columns({ block, edit }: BlockProps<ColumnsBlock>) {
     <div className={`t-columns t-columns-${block.style}`} style={{ "--t-columns": block.items.length } as CSSProperties}>
       {block.items.map((item, i) => (
         <div key={i} className="t-column">
-          {block.style === "cards" && item.src && <Img src={item.src} alt={item.alt} sizes="(min-width: 44rem) 20rem, 100vw" />}
+          {block.style === "cards" && item.src && <Img src={item.src} alt={item.alt} focal={item.focal} sizes="(min-width: 44rem) 20rem, 100vw" />}
           {(edit || item.title) && (
             <h3 className="t-column-title">
               <TextField value={item.title} onChange={edit && ((title) => change(i, { title }))} placeholder="Titel" />
@@ -193,7 +193,7 @@ function Hero({ block, edit }: BlockProps<HeroBlock>) {
   const buttons = edit ? block.buttons : block.buttons.filter((button) => button.label.trim() && button.href);
   return (
     <div className={block.src ? "t-hero t-hero-image" : "t-hero t-band-accent"}>
-      {block.src && <Img src={block.src} alt={block.alt} sizes="100vw" eager />}
+      {block.src && <Img src={block.src} alt={block.alt} focal={block.focal} sizes="100vw" eager />}
       <div className="t-hero-content">
         <h1 className="t-hero-title">
           <TextField value={block.title} onChange={edit && ((title) => edit({ title }))} placeholder="Titel der Seite" />
@@ -327,7 +327,7 @@ function Team({ block, edit }: BlockProps<TeamBlock>) {
       {members.map((member, i) => (
         <li key={i} className="t-member">
           {member.src ? (
-            <Img src={member.src} alt={member.alt} sizes="10rem" />
+            <Img src={member.src} alt={member.alt} focal={member.focal} sizes="10rem" />
           ) : (
             edit && <span className="t-member-photo-empty" aria-hidden="true" />
           )}
@@ -372,7 +372,7 @@ export function BlockFlow({ blocks, children }: FlowProps) {
         const first = band[0];
         if (first?.type !== "section") return <Runs key="start" blocks={band} start={start} children={children} />;
         return (
-          <div key={first.id} className={`t-band t-band-${first.background}`}>
+          <div key={first.id} className={`t-band t-band-${first.background} t-band-width-${first.width ?? "content"} t-band-spacing-${first.spacing ?? "normal"} t-band-align-${first.align ?? "left"}`}>
             <Runs blocks={band} start={start} children={children} />
           </div>
         );

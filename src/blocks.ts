@@ -9,23 +9,25 @@ export type HeadingLevel = 1 | 2 | 3;
 export type HeadingBlock = { id: string; type: "heading"; text: string; level: HeadingLevel };
 export type TextBlock = { id: string; type: "text"; text: string };
 // Wide images break out of the text column, full ones span the whole window.
+export type FocalPoint = { x: number; y: number };
+export type ImageContent = { src: string; alt: string; focal?: FocalPoint };
 export type ImageWidth = "normal" | "wide" | "full";
-export type ImageBlock = { id: string; type: "image"; src: string; alt: string; caption: string; width: ImageWidth };
+export type ImageBlock = { id: string; type: "image"; src: string; alt: string; focal?: FocalPoint; caption: string; width: ImageWidth };
 // Galleries show 2 to 4 pictures per row, cropped to squares or in their own proportions.
-export type GalleryBlock = { id: string; type: "gallery"; images: { src: string; alt: string }[]; columns: 2 | 3 | 4; crop: boolean };
+export type GalleryBlock = { id: string; type: "gallery"; images: ImageContent[]; columns: 2 | 3 | 4; crop: boolean };
 export type ButtonBlock = { id: string; type: "button"; label: string; href: string; variant: "primary" | "secondary" };
 // Columns are plain text side by side, or cards with an optional picture and link.
-export type Column = { title: string; text: string; src: string; alt: string; href: string; linkLabel: string };
+export type Column = { focal?: FocalPoint; title: string; text: string; src: string; alt: string; href: string; linkLabel: string };
 export type ColumnsBlock = { id: string; type: "columns"; style: "plain" | "cards"; items: Column[] };
 export type VideoBlock = { id: string; type: "video"; url: string; title: string };
 export type QuoteBlock = { id: string; type: "quote"; text: string; cite: string };
 export type DividerBlock = { id: string; type: "divider" };
 // Starts a new full-width band of the page. Everything up to the next section shares its background.
 export type SectionBackground = "plain" | "soft" | "accent" | "inverse";
-export type SectionBlock = { id: string; type: "section"; background: SectionBackground };
+export type SectionBlock = { id: string; type: "section"; background: SectionBackground; width?: "content" | "wide" | "full"; spacing?: "compact" | "normal" | "spacious"; align?: "left" | "center" };
 // A large picture across the whole window with the page title, a sentence and up to two buttons on top.
 export type HeroButton = { label: string; href: string };
-export type HeroBlock = { id: string; type: "hero"; title: string; text: string; src: string; alt: string; buttons: HeroButton[] };
+export type HeroBlock = { id: string; type: "hero"; focal?: FocalPoint; title: string; text: string; src: string; alt: string; buttons: HeroButton[] };
 // A menu or price list: name and price on one line, an optional description below.
 export type PriceItem = { name: string; description: string; price: string };
 export type PricesBlock = { id: string; type: "prices"; items: PriceItem[] };
@@ -36,7 +38,7 @@ export type FaqBlock = { id: string; type: "faq"; items: FaqItem[] };
 export type HoursRow = { days: string; time: string };
 export type HoursBlock = { id: string; type: "hours"; rows: HoursRow[]; note: string };
 // People with a photo, name, role and a few words.
-export type TeamMember = { name: string; role: string; text: string; src: string; alt: string };
+export type TeamMember = { focal?: FocalPoint; name: string; role: string; text: string; src: string; alt: string };
 export type TeamBlock = { id: string; type: "team"; members: TeamMember[] };
 
 export type Block =
@@ -70,8 +72,11 @@ export type Page = {
   inNav: boolean;
   blocks: Block[];
   updatedAt: string;
-  // Posts only: when it went public; null while it is a draft.
+  // When the first live version went public; null while it is a draft.
   publishedAt: string | null;
+  version: number;
+  hasChanges: boolean;
+  deletedAt: string | null;
 };
 
 // Slug of the start page, served at "/".
@@ -324,7 +329,7 @@ export function parseBlocks(input: unknown): Block[] {
             return {
               title: string(column.title, `${at}.title`, 500),
               text: string(column.text, `${at}.text`),
-              ...image({ src: column.src ?? "", alt: column.alt ?? "" }, at),
+              ...image({ src: column.src ?? "", alt: column.alt ?? "", focal: column.focal }, at),
               href: href(column.href ?? "", `${at}.href`),
               linkLabel: string(column.linkLabel ?? "", `${at}.linkLabel`, 200),
             };
@@ -343,7 +348,12 @@ export function parseBlocks(input: unknown): Block[] {
       case "divider":
         return { id, type: "divider" };
       case "section":
-        return { id, type: "section", background: Object.hasOwn(sectionBackgrounds, value.background as string) ? (value.background as SectionBackground) : "plain" };
+        return {
+          id, type: "section", background: Object.hasOwn(sectionBackgrounds, value.background as string) ? (value.background as SectionBackground) : "plain",
+          ...(value.width !== undefined && { width: value.width === "wide" || value.width === "full" ? value.width : "content" }),
+          ...(value.spacing !== undefined && { spacing: value.spacing === "compact" || value.spacing === "spacious" ? value.spacing : "normal" }),
+          ...(value.align !== undefined && { align: value.align === "center" ? "center" : "left" }),
+        };
       case "hero": {
         // The hero's title is the page title.
         hasTitle = true;
@@ -412,7 +422,15 @@ function image(value: Record<string, unknown>, where: string) {
   if (src !== "" && !isSafeImageSrc(src)) {
     throw new ValidationError(`${where}.src muss mit https://, http:// oder / beginnen`);
   }
-  return { src, alt: string(value.alt, `${where}.alt`, 500) };
+  let focal: FocalPoint | undefined;
+  if (value.focal !== undefined) {
+    const point = object(value.focal, `${where}.focal`);
+    if (![point.x, point.y].every((n) => typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= 1)) {
+      throw new ValidationError(`${where}: Der Bild-Fokuspunkt muss innerhalb des Bildes liegen`);
+    }
+    focal = { x: point.x as number, y: point.y as number };
+  }
+  return { src, alt: string(value.alt, `${where}.alt`, 500), ...(focal && { focal }) };
 }
 
 function href(value: unknown, field: string): string {

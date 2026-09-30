@@ -1,3 +1,4 @@
+import type { SavedSectionTemplate } from "./templates";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { BLOG, HOME, type NavItem, type Page, type SiteSettings, excerpt, formatDate, pagePath, publicPath } from "./blocks";
@@ -27,6 +28,7 @@ export type EditorData = {
   legal: NavItem[];
   // All pages, offered as link targets.
   pages: NavItem[];
+  templates?: SavedSectionTemplate[];
 };
 
 type DocumentProps = { title: string; themeCss?: string; icon?: string; head?: ReactNode; children: ReactNode };

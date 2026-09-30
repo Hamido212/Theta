@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite";
 
-// The whole site lives in one SQLite file: copy the file and you have moved the site.
+// Content lives in SQLite; a complete backup also includes the uploads directory.
 
 // Each entry upgrades the schema by one version. Never edit an entry that has shipped;
 // append a new one instead. PRAGMA user_version records how many have run.
@@ -53,6 +53,17 @@ const migrations: string[] = [
    CREATE INDEX revisions_by_page ON revisions (slug, id)`,
   `ALTER TABLE pages ADD COLUMN kind TEXT NOT NULL DEFAULT 'page';
    ALTER TABLE pages ADD COLUMN published_at TEXT`,
+  `ALTER TABLE pages ADD COLUMN version INTEGER NOT NULL DEFAULT 1;
+   ALTER TABLE pages ADD COLUMN live_data TEXT;
+   ALTER TABLE pages ADD COLUMN deleted_at TEXT;
+   ALTER TABLE revisions ADD COLUMN autosave INTEGER NOT NULL DEFAULT 0;
+   UPDATE pages SET published_at = updated_at WHERE kind = 'page';
+   UPDATE pages SET live_data = json_object('title', title, 'description', description,
+     'inNav', json(CASE WHEN in_nav = 1 THEN 'true' ELSE 'false' END),
+     'blocks', json(blocks), 'updatedAt', updated_at) WHERE published_at IS NOT NULL;
+   CREATE TABLE section_templates (
+     id TEXT PRIMARY KEY, title TEXT NOT NULL, blocks TEXT NOT NULL, created_at TEXT NOT NULL
+   )`,
 ];
 
 export function openDatabase(path: string): Database {

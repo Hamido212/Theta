@@ -94,6 +94,7 @@ describe("serving", () => {
     const { request, pages, media } = await testSite();
     const item = await media.add(await photo());
     pages.save("home", { blocks: [{ id: "i", type: "image", src: item.url, alt: "Meer", caption: "", width: "normal" }] });
+    pages.publish("home", true);
     const html = await (await request("/")).text();
     expect(html).toContain("srcSet=");
     expect(html).toContain(`/media/${item.id}/480.webp 480w, /media/${item.id}/960.webp 960w, ${item.url} 1000w`);
@@ -101,14 +102,17 @@ describe("serving", () => {
   });
 });
 
-test("deleting warns about pages that use the image and removes the files", async () => {
+test("deletion preserves referenced images and removes only unused files", async () => {
   const { request, pages, media, uploads } = await testSite({ login: true });
   const item = await media.add(await photo());
   pages.save("home", { blocks: [{ id: "g", type: "gallery", images: [{ src: item.url, alt: "" }], columns: 3, crop: true }] });
   expect(await (await request("/admin/media")).text()).toContain("Verwendet auf: Willkommen bei Theta");
 
   const res = await request(`/admin/media/${item.id}/delete`, form({}));
-  expect(res.status).toBe(302);
-  expect(media.list()).toHaveLength(0);
-  expect(existsSync(join(uploads, item.id))).toBe(false);
+  expect(res.status).toBe(400);
+  expect(media.list()).toHaveLength(1);
+  expect(existsSync(join(uploads, item.id))).toBe(true);
+  const unused = await media.add(await photo());
+  expect((await request(`/admin/media/${unused.id}/delete`, form({}))).status).toBe(302);
+  expect(existsSync(join(uploads, unused.id))).toBe(false);
 });
