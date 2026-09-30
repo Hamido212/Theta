@@ -526,7 +526,7 @@
 .theta-nav-links { display: grid; gap: 8px; padding: 20px 8px; margin-bottom: 18px; border-bottom: 1px solid #dce2eb; }
 .theta-nav-links a { color: #526175; text-decoration: none; }
 .theta-publication { padding-bottom: 22px; margin-bottom: 22px; border-bottom: 1px solid #dce2eb; }
-.theta-canvas { min-width: 0; container-type: inline-size; overflow: clip; min-height: calc(100vh - 62px); }
+.theta-canvas { min-width: 0; container-type: inline-size; overflow: clip; min-height: calc(100vh - 62px); background: var(--t-color-bg); }
 .theta-canvas > .t-page { --t-viewport: 100cqw; }
 .theta-format-dock { position: relative; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 10px 16px; border-bottom: 1px solid #dce2eb; }
 .theta-format-dock > span { color: #526175; font-size: 11px; }
