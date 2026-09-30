@@ -91,6 +91,11 @@ function Editor({ initial }: { initial: Page }) {
         <button className="theta-button theta-primary" onClick={save} disabled={state === "saving" || state === "saved"}>
           Speichern
         </button>
+        <form method="post" action="/logout">
+          <button className="theta-button" type="submit">
+            Abmelden
+          </button>
+        </form>
       </header>
 
       <main className="t-page">

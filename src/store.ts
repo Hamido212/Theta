@@ -1,24 +1,10 @@
-import { Database } from "bun:sqlite";
+import type { Database } from "bun:sqlite";
 import { type Block, type Page, parseBlocks } from "./blocks";
-
-// The whole site lives in one SQLite file: copy the file and you have moved the site.
 
 type PageRow = { slug: string; title: string; blocks: string; updated_at: string };
 
 export class PageStore {
-  private db: Database;
-
-  constructor(path: string = "theta.db") {
-    this.db = new Database(path, { create: true, strict: true });
-    this.db.run("PRAGMA journal_mode = WAL");
-    this.db.run(`
-      CREATE TABLE IF NOT EXISTS pages (
-        slug       TEXT PRIMARY KEY,
-        title      TEXT NOT NULL,
-        blocks     TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      )
-    `);
+  constructor(private db: Database) {
     if (!this.get("home")) this.save("home", homePage);
   }
 
@@ -44,10 +30,6 @@ export class PageStore {
       )
       .run(slug, page.title, JSON.stringify(page.blocks), updatedAt);
     return { slug, title: page.title, blocks: page.blocks, updatedAt };
-  }
-
-  close() {
-    this.db.close();
   }
 }
 
