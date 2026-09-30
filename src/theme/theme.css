@@ -1,0 +1,82 @@
+/* Default theme. Everything visual is driven by these design tokens;
+   changing a site's look means changing tokens, never individual blocks. */
+:root {
+  --t-color-bg: #fbfaf7;
+  --t-color-text: #1d1b18;
+  --t-color-muted: #6b665e;
+  --t-color-accent: #4f46e5;
+  --t-font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --t-font-heading: ui-serif, Georgia, "Times New Roman", serif;
+  --t-space: 1.5rem;
+  --t-measure: 42rem;
+  --t-radius: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --t-color-bg: #16151a;
+    --t-color-text: #ecebe8;
+    --t-color-muted: #a19c93;
+    --t-color-accent: #a5b4fc;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--t-color-bg);
+  color: var(--t-color-text);
+  font-family: var(--t-font-body);
+  font-size: 1.125rem;
+  line-height: 1.65;
+}
+
+.t-page {
+  max-width: var(--t-measure);
+  margin: 0 auto;
+  padding: calc(var(--t-space) * 3) var(--t-space);
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space);
+}
+
+.t-heading {
+  margin: 0;
+  font-family: var(--t-font-heading);
+  font-size: clamp(2rem, 5vw, 3rem);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+.t-text p {
+  margin: 0 0 1em;
+}
+
+.t-text p:last-child {
+  margin-bottom: 0;
+}
+
+.t-image {
+  margin: 0;
+}
+
+.t-image img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--t-radius);
+}
+
+.t-image-empty {
+  display: grid;
+  place-items: center;
+  min-height: 12rem;
+  border: 2px dashed color-mix(in srgb, var(--t-color-muted) 50%, transparent);
+  border-radius: var(--t-radius);
+  color: var(--t-color-muted);
+}

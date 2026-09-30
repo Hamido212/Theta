@@ -1,0 +1,143 @@
+/* Editor chrome only. The page itself is styled by the theme. */
+.theta-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
+  background: color-mix(in srgb, var(--t-color-bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid color-mix(in srgb, var(--t-color-muted) 25%, transparent);
+  font: 500 0.9rem/1.2 var(--t-font-body);
+}
+
+.theta-logo {
+  margin-right: auto;
+}
+
+.theta-status {
+  color: var(--t-color-muted);
+}
+
+.theta-status-dirty {
+  color: #b45309;
+}
+
+.theta-status-error {
+  color: #dc2626;
+}
+
+.theta-button,
+.theta-controls button {
+  font: inherit;
+  font-size: 0.875rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--t-color-muted) 35%, transparent);
+  background: transparent;
+  color: var(--t-color-text);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.theta-button:disabled,
+.theta-controls button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.theta-primary {
+  background: var(--t-color-accent);
+  border-color: var(--t-color-accent);
+  color: var(--t-color-bg);
+}
+
+.theta-block {
+  position: relative;
+  border-radius: 8px;
+  outline: 1px dashed transparent;
+  outline-offset: 8px;
+}
+
+.theta-block:hover,
+.theta-block:focus-within {
+  outline-color: color-mix(in srgb, var(--t-color-accent) 45%, transparent);
+}
+
+.theta-controls {
+  position: absolute;
+  top: -2.4rem;
+  right: 0;
+  display: none;
+  gap: 0.25rem;
+  align-items: center;
+  font: 0.8rem/1 var(--t-font-body);
+}
+
+.theta-controls button {
+  padding: 0.25rem 0.5rem;
+  background: var(--t-color-bg);
+}
+
+.theta-block:hover .theta-controls,
+.theta-block:focus-within .theta-controls {
+  display: flex;
+}
+
+.theta-block-label {
+  margin-right: 0.25rem;
+  color: var(--t-color-muted);
+}
+
+.theta-editable {
+  display: block;
+  outline: none;
+  min-height: 1em;
+  cursor: text;
+}
+
+.theta-editable-multiline {
+  white-space: pre-wrap;
+}
+
+.theta-editable:empty::before {
+  content: attr(data-placeholder);
+  color: var(--t-color-muted);
+}
+
+.theta-settings {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.theta-settings label {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--t-color-muted);
+}
+
+.theta-settings input {
+  font: inherit;
+  padding: 0.45rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--t-color-muted) 35%, transparent);
+  background: transparent;
+  color: var(--t-color-text);
+}
+
+.theta-hint {
+  margin: 0;
+  color: #b45309;
+}
+
+.theta-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding-top: var(--t-space);
+  border-top: 1px dashed color-mix(in srgb, var(--t-color-muted) 35%, transparent);
+}
