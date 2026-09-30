@@ -1,4 +1,4 @@
-import { type Block, type SectionBackground, emptyColumn, newBlock } from "./blocks";
+import { type Block, type SectionBackground, newBlock } from "./blocks";
 
 // Ready-made groups of blocks, so a new page or a new part of a page starts with a
 // proven layout instead of an empty column. Headings get a sensible default; body text
@@ -12,14 +12,8 @@ const heading = (text: string, level: 1 | 2 | 3 = 2): Draft => ({ type: "heading
 const text = (): Draft => ({ type: "text", text: "" });
 const section = (background: SectionBackground): Draft => ({ type: "section", background });
 const button = (label: string): Draft => ({ type: "button", label, href: "", variant: "primary" });
-const contactDetails = (): Draft => ({
-  type: "columns",
-  style: "plain",
-  items: [
-    { ...emptyColumn(), title: "Adresse" },
-    { ...emptyColumn(), title: "Öffnungszeiten" },
-  ],
-});
+// Address and phone as text, then the opening hours.
+const contactDetails = (): Draft[] => [text(), heading("Öffnungszeiten", 3), strip(newBlock("hours")), button("E-Mail schreiben")];
 const strip = <T extends Block>(block: T): Draft => {
   const { id: _, ...rest } = block;
   return rest as Draft;
@@ -53,14 +47,28 @@ const sections = {
     hint: "Überschrift und eine Galerie",
     drafts: () => [section("plain"), heading("Eindrücke"), strip(newBlock("gallery"))],
   },
+  prices: {
+    label: "Preise",
+    hint: "Überschrift und eine Preisliste",
+    drafts: () => [section("plain"), heading("Preise"), strip(newBlock("prices"))],
+  },
+  team: {
+    label: "Team",
+    hint: "Die Menschen hinter dem Angebot mit Foto",
+    drafts: () => [section("plain"), heading("Unser Team"), strip(newBlock("team"))],
+  },
+  faq: {
+    label: "Häufige Fragen",
+    hint: "Fragen, deren Antwort sich per Klick öffnet",
+    drafts: () => [section("soft"), heading("Häufige Fragen"), strip(newBlock("faq"))],
+  },
   contact: {
     label: "Kontakt",
     hint: "Adresse, Öffnungszeiten und ein Button",
     drafts: () => [
       section("soft"),
       heading("Kontakt"),
-      contactDetails(),
-      button("E-Mail schreiben"),
+      ...contactDetails(),
     ],
   },
 } satisfies Record<string, { label: string; hint: string; drafts: () => Draft[] }>;
@@ -100,15 +108,25 @@ const pages = {
   },
   about: {
     label: "Über uns",
-    drafts: (title: string) => [heading(title, 1), text(), { ...strip(newBlock("image")), width: "wide" } as Draft, ...sections.voices.drafts()],
+    drafts: (title: string) => [
+      heading(title, 1),
+      text(),
+      { ...strip(newBlock("image")), width: "wide" } as Draft,
+      ...sections.team.drafts(),
+      ...sections.voices.drafts(),
+    ],
+  },
+  prices: {
+    label: "Preise oder Speisekarte",
+    drafts: (title: string) => [heading(title, 1), text(), heading("Kategorie", 2), strip(newBlock("prices"))],
   },
   services: {
     label: "Angebot",
-    drafts: (title: string) => [heading(title, 1), text(), strip(newBlock("columns")), ...sections.action.drafts()],
+    drafts: (title: string) => [heading(title, 1), text(), strip(newBlock("columns")), ...sections.faq.drafts(), ...sections.action.drafts()],
   },
   contact: {
     label: "Kontakt",
-    drafts: (title: string) => [heading(title, 1), text(), contactDetails(), button("E-Mail schreiben")],
+    drafts: (title: string) => [heading(title, 1), ...contactDetails()],
   },
 } satisfies Record<string, { label: string; drafts: (title: string) => Draft[] }>;
 

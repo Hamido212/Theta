@@ -435,6 +435,161 @@ a.t-column-link:hover {
   content: "— ";
 }
 
+/* Price list: name and price on one line, joined by a dotted leader. */
+.t-prices {
+  display: grid;
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.t-price-line {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+
+.t-price-dots {
+  flex: 1;
+  min-width: 1.5rem;
+  border-bottom: 1px dotted color-mix(in srgb, var(--t-color-muted) 60%, transparent);
+}
+
+.t-price {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.t-price-description {
+  margin-top: 0.15rem;
+  color: var(--t-color-muted);
+  font-size: 0.95em;
+}
+
+/* Questions open their answer on click, without any script. */
+.t-faq {
+  border-top: 1px solid color-mix(in srgb, var(--t-color-muted) 30%, transparent);
+}
+
+.t-faq-item {
+  border-bottom: 1px solid color-mix(in srgb, var(--t-color-muted) 30%, transparent);
+}
+
+.t-faq-question {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 0;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+
+.t-faq-question::-webkit-details-marker {
+  display: none;
+}
+
+summary.t-faq-question::after {
+  content: "+";
+  color: var(--t-color-accent);
+  font-size: 1.3em;
+  line-height: 1;
+  transition: transform 0.2s;
+}
+
+details[open] > summary.t-faq-question::after {
+  transform: rotate(45deg);
+}
+
+.t-faq-answer {
+  padding-bottom: 1rem;
+}
+
+div.t-faq-item .t-faq-question {
+  padding-bottom: 0.25rem;
+}
+
+.t-hours dl {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.t-hours-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0 1.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--t-color-muted) 25%, transparent);
+}
+
+.t-hours dt {
+  font-weight: 600;
+}
+
+.t-hours dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.t-hours-note {
+  margin: 0.75rem 0 0;
+  color: var(--t-color-muted);
+  font-size: 0.95em;
+}
+
+/* Team: round photos in a grid that adapts to the space. */
+.t-team {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(9rem, 100%), 1fr));
+  gap: var(--t-space);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  text-align: center;
+}
+
+.t-member > img,
+.t-member-photo-empty {
+  display: block;
+  width: 7.5rem;
+  height: 7.5rem;
+  margin: 0 auto 0.75rem;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.t-member-photo-empty {
+  background: color-mix(in srgb, var(--t-color-text) 8%, var(--t-color-bg));
+}
+
+.t-member-name {
+  margin: 0;
+  font-family: var(--t-font-heading);
+  font-size: 1.2rem;
+  line-height: 1.3;
+}
+
+.t-member-role {
+  margin: 0.2rem 0 0;
+  color: var(--t-color-accent);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.t-member-text {
+  margin-top: 0.5rem;
+  color: var(--t-color-muted);
+  font-size: 0.95rem;
+}
+
+.t-member-text p {
+  margin: 0;
+}
+
 .t-divider {
   width: 100%;
   margin: 0;

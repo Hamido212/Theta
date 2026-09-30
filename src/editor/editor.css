@@ -482,6 +482,11 @@
   border-top: 1px dashed color-mix(in srgb, var(--t-color-muted) 30%, transparent);
 }
 
+.theta-list-name {
+  flex: 1;
+  color: var(--t-color-text);
+}
+
 .theta-card-settings legend {
   float: left;
   padding: 0;
