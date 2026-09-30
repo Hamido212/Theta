@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
 import type { Revision, RevisionSummary } from "../blocks";
 
-// Earlier saved versions of the page. Loading one puts it into the editor as unsaved
-// changes, so it can be looked at first and is only restored when saved.
+// Earlier saved versions. Restore preserves the current draft first and keeps the
+// selected version private until the user explicitly publishes it.
 
 const formatTime = (iso: string) =>
   new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
 
-export function HistoryPanel({ slug, onLoad }: { slug: string; onLoad: (revision: Revision) => void }) {
+export function HistoryPanel({ slug, onLoad }: { slug: string; onLoad: (revision: Revision) => Promise<void> }) {
   const [revisions, setRevisions] = useState<RevisionSummary[] | null>(null);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetch(`/api/pages/${encodeURIComponent(slug)}/revisions`)
@@ -19,13 +20,15 @@ export function HistoryPanel({ slug, onLoad }: { slug: string; onLoad: (revision
   }, [slug]);
 
   const load = async (id: number) => {
+    setLoading(true);
+    setError("");
     try {
       const res = await fetch(`/api/pages/${encodeURIComponent(slug)}/revisions/${id}`);
       if (!res.ok) throw new Error(res.statusText);
-      onLoad((await res.json()) as Revision);
+      await onLoad((await res.json()) as Revision);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-    }
+    } finally { setLoading(false); }
   };
 
   return (
@@ -46,7 +49,7 @@ export function HistoryPanel({ slug, onLoad }: { slug: string; onLoad: (revision
                 {index === 0 && " · aktuell"}
               </span>
               {index > 0 && (
-                <button className="theta-button" onClick={() => load(revision.id)}>
+                <button className="theta-button" disabled={loading} onClick={() => void load(revision.id)}>
                   Diese Version laden
                 </button>
               )}
