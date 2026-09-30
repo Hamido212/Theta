@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { type Block, type BlockType, type ImageBlock, type Page, blockLabels, newBlock } from "../blocks";
+import { type Block, type BlockType, HOME, type ImageBlock, type Page, blockLabels, editPath, newBlock, publicPath } from "../blocks";
+import type { EditorData } from "../render";
 import { BlockView } from "../theme/blocks";
+import { SiteFrame } from "../theme/layout";
 
 type SaveState = "saved" | "dirty" | "saving" | "error";
+type PageMeta = Pick<Page, "title" | "description" | "inNav">;
 
 const saveLabels: Record<SaveState, string> = {
   saved: "Gespeichert",
@@ -12,17 +15,28 @@ const saveLabels: Record<SaveState, string> = {
   error: "Speichern fehlgeschlagen",
 };
 
-function Editor({ initial }: { initial: Page }) {
-  const [blocks, setBlocks] = useState(initial.blocks);
+function Editor({ page, site, nav }: EditorData) {
+  const [blocks, setBlocks] = useState(page.blocks);
+  const [meta, setMeta] = useState<PageMeta>({ title: page.title, description: page.description, inNav: page.inNav });
+  const [showSettings, setShowSettings] = useState(false);
   const [state, setState] = useState<SaveState>("saved");
   const [error, setError] = useState("");
   // Counts edits, so a save that finishes after further typing does not report "saved".
   const version = useRef(0);
 
-  const change = (next: (blocks: Block[]) => Block[]) => {
+  const touch = () => {
     version.current++;
-    setBlocks(next);
     setState("dirty");
+  };
+
+  const change = (next: (blocks: Block[]) => Block[]) => {
+    setBlocks(next);
+    touch();
+  };
+
+  const changeMeta = (patch: Partial<PageMeta>) => {
+    setMeta((current) => ({ ...current, ...patch }));
+    touch();
   };
 
   const update = (id: string, patch: Partial<Block>) =>
@@ -44,10 +58,10 @@ function Editor({ initial }: { initial: Page }) {
     const saving = version.current;
     setState("saving");
     try {
-      const res = await fetch(`/api/pages/${encodeURIComponent(initial.slug)}`, {
+      const res = await fetch(`/api/pages/${encodeURIComponent(page.slug)}`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ blocks }),
+        body: JSON.stringify({ ...meta, blocks }),
       });
       if (!res.ok) throw new Error(((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? res.statusText);
       setError("");
@@ -56,7 +70,7 @@ function Editor({ initial }: { initial: Page }) {
       setError(err instanceof Error ? err.message : String(err));
       setState("error");
     }
-  }, [blocks, initial.slug]);
+  }, [blocks, meta, page.slug]);
 
   // Ctrl/Cmd + S saves, and leaving with unsaved changes asks first.
   useEffect(() => {
@@ -80,12 +94,17 @@ function Editor({ initial }: { initial: Page }) {
   return (
     <>
       <header className="theta-bar">
-        <strong className="theta-logo">θ Theta</strong>
+        <a className="theta-logo" href="/admin">
+          θ Übersicht
+        </a>
         <span className={`theta-status theta-status-${state}`} title={error || undefined}>
           {saveLabels[state]}
           {error && `: ${error}`}
         </span>
-        <a className="theta-button" href="/" target="_blank" rel="noopener">
+        <button className="theta-button" onClick={() => setShowSettings((open) => !open)} aria-expanded={showSettings}>
+          Seiteneinstellungen
+        </button>
+        <a className="theta-button" href={publicPath(page.slug)} target="_blank" rel="noopener">
           Ansehen
         </a>
         <button className="theta-button theta-primary" onClick={save} disabled={state === "saving" || state === "saved"}>
@@ -98,7 +117,9 @@ function Editor({ initial }: { initial: Page }) {
         </form>
       </header>
 
-      <main className="t-page">
+      {showSettings && <PageSettings slug={page.slug} meta={meta} onChange={changeMeta} />}
+
+      <SiteFrame site={site} nav={nav} current={page.slug} linkTo={editPath}>
         {blocks.map((block, index) => (
           <section key={block.id} className="theta-block" aria-label={blockLabels[block.type]}>
             <div className="theta-controls">
@@ -125,8 +146,40 @@ function Editor({ initial }: { initial: Page }) {
             </button>
           ))}
         </div>
-      </main>
+      </SiteFrame>
     </>
+  );
+}
+
+function PageSettings({ slug, meta, onChange }: { slug: string; meta: PageMeta; onChange: (patch: Partial<PageMeta>) => void }) {
+  const length = meta.description.length;
+  return (
+    <div className="theta-panel">
+      <label>
+        Titel
+        <input value={meta.title} maxLength={200} onChange={(e) => onChange({ title: e.target.value })} />
+      </label>
+      <label>
+        Beschreibung für Suchmaschinen
+        <textarea
+          value={meta.description}
+          maxLength={300}
+          rows={2}
+          placeholder="Worum geht es auf dieser Seite? Ein bis zwei Sätze."
+          onChange={(e) => onChange({ description: e.target.value })}
+        />
+        <small className={length > 160 ? "theta-hint" : undefined}>
+          {length} Zeichen{length > 160 && ", Google zeigt meist nur rund 160 an"}
+        </small>
+      </label>
+      {slug !== HOME && (
+        <label className="theta-check">
+          <input type="checkbox" checked={meta.inNav} onChange={(e) => onChange({ inNav: e.target.checked })} />
+          Im Menü anzeigen
+        </label>
+      )}
+      <p className="theta-panel-note">Adresse: {publicPath(slug)}</p>
+    </div>
   );
 }
 
@@ -157,5 +210,5 @@ function ImageSettings({ block, onChange }: { block: ImageBlock; onChange: (patc
   );
 }
 
-const page = JSON.parse(document.getElementById("theta-page")!.textContent!) as Page;
-createRoot(document.getElementById("theta-editor")!).render(<Editor initial={page} />);
+const data = JSON.parse(document.getElementById("theta-page")!.textContent!) as EditorData;
+createRoot(document.getElementById("theta-editor")!).render(<Editor {...data} />);

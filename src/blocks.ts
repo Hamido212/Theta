@@ -12,9 +12,26 @@ export type BlockType = Block["type"];
 export type Page = {
   slug: string;
   title: string;
+  // Short summary for search engines and link previews.
+  description: string;
+  // Whether the page is listed in the site navigation.
+  inNav: boolean;
   blocks: Block[];
   updatedAt: string;
 };
+
+// Slug of the start page, served at "/".
+export const HOME = "home";
+
+export const publicPath = (slug: string) => (slug === HOME ? "/" : `/${slug}`);
+export const editPath = (slug: string) => (slug === HOME ? "/edit" : `/edit/${slug}`);
+
+export type SiteSettings = {
+  name: string;
+  description: string;
+};
+
+export type NavItem = { slug: string; title: string };
 
 export const blockLabels: Record<BlockType, string> = {
   heading: "Überschrift",

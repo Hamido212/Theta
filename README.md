@@ -13,7 +13,7 @@ bun install
 bun run dev
 ```
 
-Danach zeigt http://localhost:3000 die Website. Beim ersten Start gibt Theta im Terminal einen Einrichtungs-Link aus. Darüber legst du dein Konto an und landest direkt im Editor. Später meldest du dich unter http://localhost:3000/edit an.
+Danach zeigt http://localhost:3000 die Website. Beim ersten Start gibt Theta im Terminal einen Einrichtungs-Link aus. Darüber legst du dein Konto an und landest direkt im Editor. Später meldest du dich unter http://localhost:3000/admin an. Dort legst du neue Seiten an, ordnest das Menü und gibst deiner Website einen Namen.
 
 Im Editor klickst du auf einen Text und schreibst los. Gespeichert wird mit dem Knopf oder mit Strg+S (⌘+S).
 
@@ -27,6 +27,8 @@ Passwort vergessen? `bun run theta reset-password deine@adresse.de` setzt ein ne
 - **Schnell ab Werk.** Die öffentliche Seite ist reines HTML und CSS, ganz ohne JavaScript.
 - **Barrierefreiheit im Blick.** Fehlt einem Bild die Beschreibung, weist der Editor darauf hin.
 
+- **Gefunden werden.** Jede Seite hat Titel und Beschreibung für Suchmaschinen, eine kanonische Adresse und Vorschau-Daten für geteilte Links. `sitemap.xml` und `robots.txt` erzeugt Theta automatisch.
+
 Drei Blocktypen gibt es bisher: Überschrift, Text und Bild.
 
 ## Aufbau
@@ -37,8 +39,8 @@ Drei Blocktypen gibt es bisher: Überschrift, Text und Bild.
 | `src/db.ts` | SQLite-Datenbank und Schema-Migrationen |
 | `src/store.ts` | Speicherung der Seiten |
 | `src/auth.ts` | Konten, Passwörter und Anmeldungen |
-| `src/admin/` | Anmelde- und Einrichtungsseiten |
-| `src/theme/` | Das Standard-Theme: Block-Komponenten und Design-Tokens |
+| `src/admin/` | Übersicht, Anmelde- und Einrichtungsseiten |
+| `src/theme/` | Das Standard-Theme: Kopfzeile mit Menü, Block-Komponenten und Design-Tokens |
 | `src/render.tsx` | Rendert die öffentliche Seite und die Editor-Seite auf dem Server |
 | `src/editor/` | Der Editor im Browser (React) |
 | `src/server.ts` | HTTP-Server mit Hono |
@@ -56,7 +58,7 @@ Theme-Komponenten laufen an beiden Stellen: auf dem Server für die öffentliche
 
 ## Noch nicht enthalten
 
-Mehrere Seiten, Bilder hochladen, Änderungsverlauf, statischer Export und Plugins kommen noch. Der Server lauscht standardmäßig nur auf dem eigenen Rechner. Für den Betrieb im Internet setzt du `THETA_HOST=0.0.0.0` und stellst einen Proxy mit HTTPS davor.
+Bilder hochladen, Änderungsverlauf, statischer Export und Plugins kommen noch. Der Server lauscht standardmäßig nur auf dem eigenen Rechner. Für den Betrieb im Internet setzt du `THETA_HOST=0.0.0.0` und stellst einen Proxy mit HTTPS davor.
 
 ## Entwicklung
 

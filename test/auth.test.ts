@@ -79,7 +79,7 @@ describe("login", () => {
     await auth.createUser({ email: "a@example.com", name: "A", password: "richtig-geheim" });
     for (const next of ["https://evil.example", "//evil.example", "/\\evil.example"]) {
       const res = await request("/login", form({ email: "a@example.com", password: "richtig-geheim", next }));
-      expect(res.headers.get("location")).toBe("/edit");
+      expect(res.headers.get("location")).toBe("/admin");
     }
   });
 
