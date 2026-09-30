@@ -16,6 +16,7 @@ import {
 import type { EditorData } from "../render";
 import { BlockFlow, BlockView } from "../theme/blocks";
 import { SiteFrame } from "../theme/layout";
+import { FormatBar } from "./format";
 import { HistoryPanel } from "./history";
 import { BlockOptions, BlockSettings } from "./settings";
 
@@ -133,6 +134,7 @@ function Editor({ page, site, nav, pages }: EditorData) {
         <a className="theta-logo" href={post ? "/admin/blog" : "/admin"}>
           θ Übersicht
         </a>
+        <FormatBar />
         <span className={`theta-status theta-status-${state}`} title={error || undefined}>
           {saveLabels[state]}
           {error && `: ${error}`}

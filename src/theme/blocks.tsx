@@ -40,7 +40,7 @@ function Text({ block, edit }: BlockProps<TextBlock>) {
       <TextField
         value={block.text}
         onChange={edit && ((text) => edit({ text }))}
-        multiline
+        rich
         placeholder="Schreib etwas …"
       />
     </div>
@@ -121,7 +121,7 @@ function Columns({ block, edit }: BlockProps<ColumnsBlock>) {
             </h3>
           )}
           <div className="t-text">
-            <TextField value={item.text} onChange={edit && ((text) => change(i, { text }))} multiline placeholder="Text" />
+            <TextField value={item.text} onChange={edit && ((text) => change(i, { text }))} rich placeholder="Text" />
           </div>
         </div>
       ))}
