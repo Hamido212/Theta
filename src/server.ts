@@ -8,9 +8,11 @@ import { renderDashboard, renderDesign, renderLogin, renderMediaLibrary, renderS
 import { AuthError, AuthStore, type User } from "./auth";
 import { HOME, ValidationError, editPath, parseBlocks } from "./blocks";
 import { openDatabase } from "./db";
-import { MAX_UPLOAD_BYTES, type MediaItem, MediaStore } from "./media";
+import { exportSite } from "./export";
+import { MAX_UPLOAD_BYTES, type MediaItem, MediaStore, builtinMedia } from "./media";
 import { type SiteContext, renderEditor, renderNotFound, renderPage, renderRobots, renderSitemap } from "./render";
-import { PageStore, SettingsStore, parseDescription, parseTitle } from "./store";
+import { PageStore, SettingsStore, parseDescription, parseTitle, slugify } from "./store";
+import { zip } from "./zip";
 import { type PresetId, PRESETS, defaultTheme, themeCss } from "./theme/tokens";
 
 const SESSION_COOKIE = "theta_session";
@@ -174,14 +176,17 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
   app.get("/edit/:slug", (c) => editor(c, c.req.param("slug")));
 
   const dashboard = (c: Context<Env>, error?: string) =>
-    c.html(renderDashboard({ user: c.get("user"), pages: pages.list(), site: settings.site(), error }), error ? 400 : 200);
+    c.html(
+      renderDashboard({ user: c.get("user"), pages: pages.list(), site: settings.site(), origin: siteContext(c).origin, error }),
+      error ? 400 : 200,
+    );
 
   app.get("/admin", (c) => dashboard(c));
 
   app.post("/admin/pages", async (c) => {
     const form = await c.req.parseBody();
     try {
-      return c.redirect(editPath(pages.create(String(form.title ?? "")).slug));
+      return c.redirect(editPath(pages.create(String(form.title ?? ""), c.get("user").name).slug));
     } catch (err) {
       if (err instanceof ValidationError) return dashboard(c, err.message);
       throw err;
@@ -289,6 +294,26 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
     }
   });
 
+  // The whole site as a ZIP of static files, for hosting anywhere.
+  app.post("/admin/export", async (c) => {
+    const form = await c.req.parseBody();
+    let origin: string;
+    try {
+      const url = new URL(String(form.url ?? ""));
+      if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error();
+      origin = url.origin;
+    } catch {
+      return dashboard(c, "Bitte die Adresse der Website angeben, z. B. https://meine-seite.de");
+    }
+    const archive = zip(await exportSite({ pages, settings, media }, origin));
+    return new Response(archive, {
+      headers: {
+        "content-type": "application/zip",
+        "content-disposition": `attachment; filename="${slugify(settings.site().name)}-website.zip"`,
+      },
+    });
+  });
+
   app.post("/admin/site", async (c) => {
     const form = await c.req.parseBody();
     try {
@@ -305,6 +330,16 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
     return page ? c.json(page) : c.json({ error: "Seite nicht gefunden" }, 404);
   });
 
+  app.get("/api/pages/:slug/revisions", (c) => {
+    const slug = c.req.param("slug");
+    return pages.get(slug) ? c.json(pages.revisions(slug)) : c.json({ error: "Seite nicht gefunden" }, 404);
+  });
+
+  app.get("/api/pages/:slug/revisions/:id{[0-9]+}", (c) => {
+    const revision = pages.revision(c.req.param("slug"), Number(c.req.param("id")));
+    return revision ? c.json(revision) : c.json({ error: "Version nicht gefunden" }, 404);
+  });
+
   app.put("/api/pages/:slug", async (c) => {
     const page = pages.get(c.req.param("slug"));
     if (!page) return c.json({ error: "Seite nicht gefunden" }, 404);
@@ -318,7 +353,7 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
           description: body.description === undefined ? undefined : parseDescription(body.description),
           inNav: body.inNav === undefined ? undefined : body.inNav === true,
           blocks: parseBlocks(body.blocks),
-        }),
+        }, c.get("user").name),
       );
     } catch (err) {
       if (err instanceof ValidationError) return c.json({ error: err.message }, 400);
@@ -340,12 +375,9 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
     return new Response(Bun.file(path), { headers: { "cache-control": "public, max-age=31536000, immutable" } });
   });
 
-  app.get("/media/:name", async (c) => {
-    const name = c.req.param("name");
-    if (!/^[\w.-]+$/.test(name) || name.startsWith(".")) return c.notFound();
-    const file = Bun.file(new URL(`../media/${name}`, import.meta.url));
-    if (!(await file.exists())) return c.notFound();
-    return new Response(file);
+  app.get("/media/:name", (c) => {
+    const path = builtinMedia(c.req.param("name"));
+    return path ? new Response(Bun.file(path)) : c.notFound();
   });
 
   // Every other page of the site. Registered last so it cannot shadow the routes above.

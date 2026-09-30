@@ -41,6 +41,10 @@ export const HOME = "home";
 export const publicPath = (slug: string) => (slug === HOME ? "/" : `/${slug}`);
 export const editPath = (slug: string) => (slug === HOME ? "/edit" : `/edit/${slug}`);
 
+// A saved state of a page in its history.
+export type RevisionSummary = { id: number; title: string; author: string; createdAt: string };
+export type Revision = RevisionSummary & Pick<Page, "description" | "inNav" | "blocks">;
+
 export type SiteSettings = {
   name: string;
   description: string;

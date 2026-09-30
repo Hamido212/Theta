@@ -300,3 +300,31 @@
   color: var(--t-color-on-accent, var(--t-color-bg));
   cursor: pointer;
 }
+
+.theta-history {
+  display: grid;
+  gap: 0.25rem;
+  max-height: 18rem;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.theta-history li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 2.2rem;
+  color: var(--t-color-text);
+}
+
+.theta-notice {
+  max-width: 42rem;
+  margin: 1rem auto 0;
+  padding: 0.6rem 0.9rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--t-color-accent) 14%, transparent);
+  font: 0.9rem/1.4 var(--t-font-body);
+}
