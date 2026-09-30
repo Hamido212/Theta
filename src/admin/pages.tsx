@@ -131,9 +131,9 @@ function AdminBar({ user, current }: { user: User; current: "pages" | "media" | 
   );
 }
 
-type DashboardProps = { user: User; pages: Page[]; site: SiteSettings; error?: string };
+type DashboardProps = { user: User; pages: Page[]; site: SiteSettings; origin: string; error?: string };
 
-export function renderDashboard({ user, pages, site, error }: DashboardProps) {
+export function renderDashboard({ user, pages, site, origin, error }: DashboardProps) {
   const movable = pages.filter((page) => page.slug !== HOME);
   return html(
     <html lang="de">
@@ -209,6 +209,19 @@ export function renderDashboard({ user, pages, site, error }: DashboardProps) {
               </label>
               <button className="a-primary">Speichern</button>
             </form>
+          </section>
+
+          <section className="a-section">
+            <h2>Exportieren</h2>
+            <p className="a-muted">
+              Lade deine ganze Website als ZIP mit fertigen HTML-Dateien herunter. Du kannst sie bei jedem Webhoster hochladen,
+              auch ohne Theta. So gehört deine Website immer dir.
+            </p>
+            <form method="post" action="/admin/export" className="a-inline">
+              <input name="url" type="url" required defaultValue={origin} aria-label="Adresse, unter der die Website erreichbar sein wird" />
+              <button className="a-primary">ZIP herunterladen</button>
+            </form>
+            <p className="a-muted">Die Adresse wird für Suchmaschinen und Link-Vorschauen gebraucht.</p>
           </section>
         </main>
       </body>

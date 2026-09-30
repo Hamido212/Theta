@@ -23,7 +23,8 @@ Passwort vergessen? `bun run theta reset-password deine@adresse.de` setzt ein ne
 
 - **Direkt auf der Seite bearbeiten.** Der Editor zeigt die Seite genau so, wie Besucher sie sehen. Texte ändert man an Ort und Stelle, Blöcke lassen sich hinzufügen, verschieben und löschen.
 - **Leitplanken statt Stil-Chaos.** Blöcke speichern nur Inhalt. Farben, Schriften und Abstände kommen aus Design-Tokens, deshalb bleibt die Seite immer stimmig. Unter `/admin/design` wählst du eine von drei Vorlagen (Klar, Modern, Warm) und passt Akzentfarbe, Schrift, Abstände, Ecken, Breite und Hell/Dunkel an. Theta warnt bei schlecht lesbaren Farben, wählt die Textfarbe auf Buttons selbst und hellt die Akzentfarbe im Dunkelmodus automatisch auf.
-- **Die Website ist ein Ordner.** Alle Inhalte liegen in einer SQLite-Datei (`theta.db`), hochgeladene Bilder im Ordner `uploads/` daneben. Kopieren heißt umziehen.
+- **Die Website gehört dir.** Alle Inhalte liegen in einer SQLite-Datei (`theta.db`), hochgeladene Bilder im Ordner `uploads/` daneben. Kopieren heißt umziehen. Unter `/admin` lädst du die ganze Website jederzeit als ZIP mit fertigen HTML-Dateien herunter, die bei jedem Webhoster laufen, auch ohne Theta. Im Terminal geht das mit `bun run theta export <Ordner> https://deine-seite.de`.
+- **Nichts geht verloren.** Jedes Speichern legt eine Version an. Über „Verlauf“ im Editor holst du eine frühere Version zurück; die letzten 50 pro Seite bleiben erhalten.
 - **Schnell ab Werk.** Die öffentliche Seite ist reines HTML und CSS, ganz ohne JavaScript.
 - **Bilder ohne Vorarbeit.** Hochgeladene Fotos dreht Theta richtig herum, entfernt Metadaten wie den Aufnahmeort, verkleinert sie auf höchstens 2560 Pixel und erzeugt kleinere WebP-Versionen. Besucher bekommen automatisch die passende Größe.
 - **Barrierefreiheit im Blick.** Fehlt einem Bild die Beschreibung, weist der Editor darauf hin.
@@ -41,6 +42,7 @@ Blöcke: Überschrift, Text, Bild, Galerie, Button, Spalten, Video, Zitat und Tr
 | `src/store.ts` | Speicherung der Seiten |
 | `src/auth.ts` | Konten, Passwörter und Anmeldungen |
 | `src/media.ts` | Hochgeladene Bilder: Prüfung, Optimierung, kleinere Versionen |
+| `src/export.ts`, `src/zip.ts` | Export der Website als statische Dateien bzw. ZIP |
 | `src/admin/` | Übersicht, Anmelde- und Einrichtungsseiten |
 | `src/theme/` | Das Theme: Kopfzeile mit Menü, Block-Komponenten, CSS und Design-Tokens (`tokens.ts`) |
 | `src/render.tsx` | Rendert die öffentliche Seite und die Editor-Seite auf dem Server |
@@ -61,7 +63,7 @@ Theme-Komponenten laufen an beiden Stellen: auf dem Server für die öffentliche
 
 ## Noch nicht enthalten
 
-Änderungsverlauf, statischer Export und Plugins kommen noch. Der Server lauscht standardmäßig nur auf dem eigenen Rechner. Für den Betrieb im Internet setzt du `THETA_HOST=0.0.0.0` und stellst einen Proxy mit HTTPS davor.
+Plugins kommen noch. Der Server lauscht standardmäßig nur auf dem eigenen Rechner. Für den Betrieb im Internet setzt du `THETA_HOST=0.0.0.0` und stellst einen Proxy mit HTTPS davor.
 
 ## Entwicklung
 

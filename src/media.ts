@@ -161,3 +161,10 @@ const parseVariants = (json: string) => JSON.parse(json) as number[];
 function cleanFilename(name: string): string {
   return name.replace(/[\u0000-\u001f]/g, "").slice(0, 200) || "Bild";
 }
+
+// Files that ship with Theta itself (logo, favicon), served at /media/<name>.
+export function builtinMedia(name: string): string | null {
+  if (!/^[\w.-]+$/.test(name) || name.startsWith(".")) return null;
+  const path = Bun.fileURLToPath(new URL(`../media/${name}`, import.meta.url));
+  return Bun.file(path).size > 0 ? path : null;
+}

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { type Block, type BlockType, HOME, type Page, blockLabels, editPath, newBlock, publicPath } from "../blocks";
+import { type Block, type BlockType, HOME, type Page, type Revision, blockLabels, editPath, newBlock, publicPath } from "../blocks";
 import type { EditorData } from "../render";
 import { BlockView } from "../theme/blocks";
 import { SiteFrame } from "../theme/layout";
+import { HistoryPanel } from "./history";
 import { BlockSettings } from "./settings";
 
 type SaveState = "saved" | "dirty" | "saving" | "error";
@@ -19,7 +20,8 @@ const saveLabels: Record<SaveState, string> = {
 function Editor({ page, site, nav, pages }: EditorData) {
   const [blocks, setBlocks] = useState(page.blocks);
   const [meta, setMeta] = useState<PageMeta>({ title: page.title, description: page.description, inNav: page.inNav });
-  const [showSettings, setShowSettings] = useState(false);
+  const [panel, setPanel] = useState<"settings" | "history" | null>(null);
+  const [notice, setNotice] = useState("");
   const [state, setState] = useState<SaveState>("saved");
   const [error, setError] = useState("");
   // Counts edits, so a save that finishes after further typing does not report "saved".
@@ -53,6 +55,17 @@ function Editor({ page, site, nav, pages }: EditorData) {
     });
 
   const remove = (id: string) => change((list) => list.filter((b) => b.id !== id));
+
+  const loadRevision = (revision: Revision) => {
+    setBlocks(revision.blocks);
+    setMeta({ title: revision.title, description: revision.description, inNav: revision.inNav });
+    touch();
+    setPanel(null);
+    const when = new Date(revision.createdAt).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" });
+    setNotice(`Version vom ${when} geladen. Speichern, um sie wiederherzustellen, oder Seite neu laden, um sie zu verwerfen.`);
+  };
+
+  const togglePanel = (name: "settings" | "history") => setPanel((open) => (open === name ? null : name));
   const add = (type: BlockType) => change((list) => [...list, newBlock(type)]);
 
   const save = useCallback(async () => {
@@ -66,6 +79,7 @@ function Editor({ page, site, nav, pages }: EditorData) {
       });
       if (!res.ok) throw new Error(((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? res.statusText);
       setError("");
+      setNotice("");
       setState(version.current === saving ? "saved" : "dirty");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -102,7 +116,10 @@ function Editor({ page, site, nav, pages }: EditorData) {
           {saveLabels[state]}
           {error && `: ${error}`}
         </span>
-        <button className="theta-button" onClick={() => setShowSettings((open) => !open)} aria-expanded={showSettings}>
+        <button className="theta-button" onClick={() => togglePanel("history")} aria-expanded={panel === "history"}>
+          Verlauf
+        </button>
+        <button className="theta-button" onClick={() => togglePanel("settings")} aria-expanded={panel === "settings"}>
           Seiteneinstellungen
         </button>
         <a className="theta-button" href={publicPath(page.slug)} target="_blank" rel="noopener">
@@ -118,7 +135,9 @@ function Editor({ page, site, nav, pages }: EditorData) {
         </form>
       </header>
 
-      {showSettings && <PageSettings slug={page.slug} meta={meta} onChange={changeMeta} />}
+      {panel === "settings" && <PageSettings slug={page.slug} meta={meta} onChange={changeMeta} />}
+      {panel === "history" && <HistoryPanel slug={page.slug} onLoad={loadRevision} />}
+      {notice && <p className="theta-notice">{notice}</p>}
 
       <SiteFrame site={site} nav={nav} current={page.slug} linkTo={editPath}>
         {blocks.map((block, index) => (

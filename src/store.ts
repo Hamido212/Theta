@@ -1,5 +1,15 @@
 import type { Database } from "bun:sqlite";
-import { type Block, HOME, type NavItem, type Page, type SiteSettings, ValidationError, parseBlocks } from "./blocks";
+import {
+  type Block,
+  HOME,
+  type NavItem,
+  type Page,
+  type Revision,
+  type RevisionSummary,
+  type SiteSettings,
+  ValidationError,
+  parseBlocks,
+} from "./blocks";
 import { type ThemeSettings, defaultTheme, parseTheme } from "./theme/tokens";
 
 type PageRow = {
@@ -10,6 +20,11 @@ type PageRow = {
   blocks: string;
   updated_at: string;
 };
+
+// How many saved versions of each page are kept.
+const MAX_REVISIONS = 50;
+
+type RevisionRow = { id: number; title: string; description: string; in_nav: number; blocks: string; author: string; created_at: string };
 
 // Paths the app itself uses; pages cannot take them.
 const RESERVED_SLUGS = new Set([HOME, "admin", "api", "assets", "edit", "login", "logout", "media", "setup", "sitemap.xml", "robots.txt"]);
@@ -44,7 +59,7 @@ export class PageStore {
   }
 
   // Creates a page from a title and returns it. The address is derived from the title.
-  create(title: string): Page {
+  create(title: string, author = ""): Page {
     const cleanTitle = parseTitle(title);
     const base = slugify(cleanTitle);
     let slug = base;
@@ -52,10 +67,12 @@ export class PageStore {
 
     const { next } = this.db.query<{ next: number }, []>("SELECT COALESCE(MAX(position), 0) + 1 AS next FROM pages").get()!;
     this.insert(slug, { title: cleanTitle, blocks: [{ id: crypto.randomUUID(), type: "heading", text: cleanTitle }] }, next);
-    return this.get(slug)!;
+    const page = this.get(slug)!;
+    this.recordRevision(page, author);
+    return page;
   }
 
-  save(slug: string, changes: { title?: string; description?: string; inNav?: boolean; blocks?: Block[] }): Page {
+  save(slug: string, changes: { title?: string; description?: string; inNav?: boolean; blocks?: Block[] }, author = ""): Page {
     const page = this.get(slug);
     if (!page) throw new ValidationError("Seite nicht gefunden");
     const defined = Object.fromEntries(Object.entries(changes).filter(([, value]) => value !== undefined));
@@ -63,12 +80,52 @@ export class PageStore {
     this.db
       .query("UPDATE pages SET title = ?, description = ?, in_nav = ?, blocks = ?, updated_at = ? WHERE slug = ?")
       .run(next.title, next.description, next.inNav ? 1 : 0, JSON.stringify(next.blocks), new Date().toISOString(), slug);
-    return this.get(slug)!;
+    const saved = this.get(slug)!;
+    this.recordRevision(saved, author);
+    return saved;
+  }
+
+  // Saved versions of a page, newest first.
+  revisions(slug: string): RevisionSummary[] {
+    return this.db
+      .query<RevisionSummary, [string]>(
+        "SELECT id, title, author, created_at AS createdAt FROM revisions WHERE slug = ? ORDER BY id DESC",
+      )
+      .all(slug);
+  }
+
+  revision(slug: string, id: number): Revision | null {
+    const row = this.db
+      .query<RevisionRow, [string, number]>("SELECT * FROM revisions WHERE slug = ? AND id = ?")
+      .get(slug, id);
+    if (!row) return null;
+    return {
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      inNav: row.in_nav === 1,
+      blocks: parseBlocks(JSON.parse(row.blocks)),
+      author: row.author,
+      createdAt: row.created_at,
+    };
+  }
+
+  private recordRevision(page: Page, author: string) {
+    this.db
+      .query("INSERT INTO revisions (slug, title, description, in_nav, blocks, author, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .run(page.slug, page.title, page.description, page.inNav ? 1 : 0, JSON.stringify(page.blocks), author, page.updatedAt);
+    this.db
+      .query(
+        `DELETE FROM revisions WHERE slug = ? AND id NOT IN
+           (SELECT id FROM revisions WHERE slug = ? ORDER BY id DESC LIMIT ${MAX_REVISIONS})`,
+      )
+      .run(page.slug, page.slug);
   }
 
   delete(slug: string) {
     if (slug === HOME) throw new ValidationError("Die Startseite kann nicht gelöscht werden");
     this.db.query("DELETE FROM pages WHERE slug = ?").run(slug);
+    this.db.query("DELETE FROM revisions WHERE slug = ?").run(slug);
   }
 
   // Moves a page one step up (-1) or down (1) in the navigation order.

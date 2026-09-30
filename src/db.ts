@@ -40,6 +40,17 @@ const migrations: string[] = [
      variants   TEXT NOT NULL,
      created_at TEXT NOT NULL
    )`,
+  `CREATE TABLE revisions (
+     id          INTEGER PRIMARY KEY,
+     slug        TEXT NOT NULL,
+     title       TEXT NOT NULL,
+     description TEXT NOT NULL,
+     in_nav      INTEGER NOT NULL,
+     blocks      TEXT NOT NULL,
+     author      TEXT NOT NULL,
+     created_at  TEXT NOT NULL
+   );
+   CREATE INDEX revisions_by_page ON revisions (slug, id)`,
 ];
 
 export function openDatabase(path: string): Database {
