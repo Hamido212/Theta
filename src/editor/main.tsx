@@ -14,10 +14,10 @@ import {
   pagePath,
 } from "../blocks";
 import type { EditorData } from "../render";
-import { BlockView } from "../theme/blocks";
+import { BlockFlow, BlockView } from "../theme/blocks";
 import { SiteFrame } from "../theme/layout";
 import { HistoryPanel } from "./history";
-import { BlockSettings } from "./settings";
+import { BlockOptions, BlockSettings } from "./settings";
 
 type SaveState = "saved" | "dirty" | "saving" | "error";
 type PageMeta = Pick<Page, "title" | "description" | "inNav"> & { published: boolean };
@@ -168,24 +168,27 @@ function Editor({ page, site, nav, pages }: EditorData) {
             {meta.published ? formatDate(publishedAt ?? new Date().toISOString()) : "Entwurf, noch nicht veröffentlicht"}
           </p>
         )}
-        {blocks.map((block, index) => (
-          <section key={block.id} className="theta-block" aria-label={blockLabels[block.type]}>
-            <div className="theta-controls">
-              <span className="theta-block-label">{blockLabels[block.type]}</span>
-              <button onClick={() => move(index, -1)} disabled={index === 0} aria-label="Nach oben">
-                ↑
-              </button>
-              <button onClick={() => move(index, 1)} disabled={index === blocks.length - 1} aria-label="Nach unten">
-                ↓
-              </button>
-              <button onClick={() => remove(block.id)} aria-label="Block löschen">
-                ✕
-              </button>
-            </div>
-            <BlockView block={block} edit={(patch) => update(block.id, patch)} />
-            <BlockSettings block={block} onChange={(patch) => update(block.id, patch)} pages={pages} />
-          </section>
-        ))}
+        <BlockFlow blocks={blocks}>
+          {(block, index) => (
+            <section key={block.id} className="theta-block" aria-label={blockLabels[block.type]}>
+              <div className="theta-controls">
+                <span className="theta-block-label">{blockLabels[block.type]}</span>
+                <BlockOptions block={block} onChange={(patch) => update(block.id, patch)} />
+                <button onClick={() => move(index, -1)} disabled={index === 0} aria-label="Nach oben">
+                  ↑
+                </button>
+                <button onClick={() => move(index, 1)} disabled={index === blocks.length - 1} aria-label="Nach unten">
+                  ↓
+                </button>
+                <button onClick={() => remove(block.id)} aria-label="Block löschen">
+                  ✕
+                </button>
+              </div>
+              <BlockView block={block} edit={(patch) => update(block.id, patch)} />
+              <BlockSettings block={block} onChange={(patch) => update(block.id, patch)} pages={pages} />
+            </section>
+          )}
+        </BlockFlow>
 
         <div className="theta-add">
           {(Object.keys(blockLabels) as BlockType[]).map((type) => (

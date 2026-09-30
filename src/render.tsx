@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { BLOG, HOME, type NavItem, type Page, type SiteSettings, excerpt, formatDate, pagePath, publicPath } from "./blocks";
-import { BlockView } from "./theme/blocks";
+import { BlockFlow, BlockView } from "./theme/blocks";
 import { type ImageLookup, Img, ImageLookupContext } from "./theme/image";
 import { SiteFrame } from "./theme/layout";
 
@@ -114,9 +114,7 @@ export function renderPage(page: Page, { site, nav, origin, images = () => null,
       <ImageLookupContext.Provider value={images}>
         <SiteFrame site={site} nav={nav} current={post ? BLOG : page.slug} linkTo={publicPath}>
           {post && <PostDate page={page} />}
-          {page.blocks.map((block) => (
-            <BlockView key={block.id} block={block} />
-          ))}
+          <BlockFlow blocks={page.blocks}>{(block) => <BlockView key={block.id} block={block} />}</BlockFlow>
           {post && (
             <p className="t-post-back">
               <a href={`/${BLOG}`}>← Alle Beiträge</a>
@@ -148,7 +146,7 @@ export function renderBlogIndex(posts: Page[], { site, nav, origin, images = () 
     >
       <ImageLookupContext.Provider value={images}>
         <SiteFrame site={site} nav={nav} current={BLOG} linkTo={publicPath}>
-          <h1 className="t-heading">Blog</h1>
+          <h1 className="t-heading t-heading-1">Blog</h1>
           {posts.length === 0 ? (
             <div className="t-text">
               <p>Hier erscheinen bald die ersten Beiträge.</p>
@@ -217,7 +215,7 @@ export function renderNotFound({ site, nav, themeCss }: SiteContext): string {
   return html(
     <Document title={`Seite nicht gefunden · ${site.name}`} themeCss={themeCss} head={<meta name="robots" content="noindex" />}>
       <SiteFrame site={site} nav={nav} current="" linkTo={publicPath}>
-        <h1 className="t-heading">Seite nicht gefunden</h1>
+        <h1 className="t-heading t-heading-1">Seite nicht gefunden</h1>
         <div className="t-text">
           <p>
             Diese Seite gibt es nicht (mehr). <a href="/">Zur Startseite</a>

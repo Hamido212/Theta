@@ -93,7 +93,7 @@ describe("serving", () => {
   test("pages use responsive sources and fixed sizes for uploaded images", async () => {
     const { request, pages, media } = await testSite();
     const item = await media.add(await photo());
-    pages.save("home", { blocks: [{ id: "i", type: "image", src: item.url, alt: "Meer" }] });
+    pages.save("home", { blocks: [{ id: "i", type: "image", src: item.url, alt: "Meer", caption: "", width: "normal" }] });
     const html = await (await request("/")).text();
     expect(html).toContain("srcSet=");
     expect(html).toContain(`/media/${item.id}/480.webp 480w, /media/${item.id}/960.webp 960w, ${item.url} 1000w`);

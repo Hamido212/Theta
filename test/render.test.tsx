@@ -12,9 +12,9 @@ const page: Page = {
   updatedAt: "2026-09-30T12:00:00.000Z",
   publishedAt: null,
   blocks: [
-    { id: "h", type: "heading", text: "Hallo <Welt>" },
+    { id: "h", type: "heading", text: "Hallo <Welt>", level: 1 },
     { id: "t", type: "text", text: "Erster Absatz\nzweite Zeile\n\nZweiter Absatz" },
-    { id: "i", type: "image", src: "/media/theta.svg", alt: "Theta" },
+    { id: "i", type: "image", src: "/media/theta.svg", alt: "Theta", caption: "", width: "normal" },
   ],
 };
 

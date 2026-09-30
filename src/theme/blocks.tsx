@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { type CSSProperties, Fragment, type ReactNode } from "react";
 import type {
   Block,
   ButtonBlock,
@@ -23,10 +23,11 @@ export type BlockProps<B extends Block> = {
 };
 
 function Heading({ block, edit }: BlockProps<HeadingBlock>) {
+  const Tag = `h${block.level}` as const;
   return (
-    <h1 className="t-heading">
+    <Tag className={`t-heading t-heading-${block.level}`}>
       <TextField value={block.text} onChange={edit && ((text) => edit({ text }))} placeholder="Überschrift" />
-    </h1>
+    </Tag>
   );
 }
 
@@ -47,11 +48,22 @@ function Empty({ children }: { children: string }) {
   return <div className="t-empty">{children}</div>;
 }
 
+const imageSizes = {
+  normal: "(min-width: 44rem) 42rem, 100vw",
+  wide: "(min-width: 74rem) 72rem, 100vw",
+  full: "100vw",
+};
+
 function Image({ block, edit }: BlockProps<ImageBlock>) {
   if (!block.src) return edit ? <Empty>Noch kein Bild ausgewählt</Empty> : null;
   return (
-    <figure className="t-image">
-      <Img src={block.src} alt={block.alt} sizes="(min-width: 44rem) 42rem, 100vw" />
+    <figure className={`t-image t-width-${block.width}`}>
+      <Img src={block.src} alt={block.alt} sizes={imageSizes[block.width]} />
+      {(edit || block.caption.trim()) && (
+        <figcaption>
+          <TextField value={block.caption} onChange={edit && ((caption) => edit({ caption }))} placeholder="Bildunterschrift (optional)" />
+        </figcaption>
+      )}
     </figure>
   );
 }
@@ -101,9 +113,9 @@ function Columns({ block, edit }: BlockProps<ColumnsBlock>) {
       {block.items.map((item, i) => (
         <div key={i} className="t-column">
           {(edit || item.title) && (
-            <h2 className="t-column-title">
+            <h3 className="t-column-title">
               <TextField value={item.title} onChange={edit && ((title) => change(i, { title }))} placeholder="Titel" />
-            </h2>
+            </h3>
           )}
           <div className="t-text">
             <TextField value={item.text} onChange={edit && ((text) => change(i, { text }))} multiline placeholder="Text" />
@@ -153,6 +165,30 @@ function Quote({ block, edit }: BlockProps<QuoteBlock>) {
         </figcaption>
       )}
     </figure>
+  );
+}
+
+// Renders a page's blocks in order. Buttons that follow each other share one row,
+// so "Book now" and "Menu" sit side by side instead of stacking.
+export function BlockFlow({ blocks, children }: { blocks: Block[]; children: (block: Block, index: number) => ReactNode }) {
+  const runs: { start: number; blocks: Block[] }[] = [];
+  blocks.forEach((block, index) => {
+    const last = runs.at(-1);
+    if (block.type === "button" && last?.blocks[0]?.type === "button") last.blocks.push(block);
+    else runs.push({ start: index, blocks: [block] });
+  });
+  return (
+    <>
+      {runs.map(({ start, blocks: run }) =>
+        run.length > 1 ? (
+          <div key={run[0]!.id} className="t-button-row">
+            {run.map((block, i) => children(block, start + i))}
+          </div>
+        ) : (
+          <Fragment key={run[0]!.id}>{children(run[0]!, start)}</Fragment>
+        ),
+      )}
+    </>
   );
 }
 

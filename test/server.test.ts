@@ -26,7 +26,7 @@ test("a fresh site has a home page with three blocks", async () => {
 test("saving blocks persists them and updates the public page", async () => {
   const res = await put({ blocks: [{ id: "a", type: "heading", text: "Neu gespeichert" }] });
   expect(res.status).toBe(200);
-  expect(pages.get("home")!.blocks).toEqual([{ id: "a", type: "heading", text: "Neu gespeichert" }]);
+  expect(pages.get("home")!.blocks).toEqual([{ id: "a", type: "heading", text: "Neu gespeichert", level: 1 }]);
   expect(await (await request("/")).text()).toContain("Neu gespeichert");
 });
 

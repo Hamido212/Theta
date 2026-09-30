@@ -24,7 +24,7 @@ describe("posts", () => {
   test("publishing puts the post in the blog, the menu and the feed", async () => {
     const { pages, request } = await testSite();
     const { slug } = pages.create("Unser neues Brot", "", "post");
-    pages.save(slug, { description: "Ab Montag gibt es Dinkel.", blocks: [{ id: "h", type: "heading", text: "Unser neues Brot" }] });
+    pages.save(slug, { description: "Ab Montag gibt es Dinkel.", blocks: [{ id: "h", type: "heading", text: "Unser neues Brot", level: 1 }] });
     const published = pages.publish(slug, true);
     expect(published.publishedAt).not.toBeNull();
 

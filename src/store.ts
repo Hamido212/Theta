@@ -107,7 +107,7 @@ export class PageStore {
     for (let n = 2; RESERVED_SLUGS.has(slug) || this.get(slug); n++) slug = `${base}-${n}`;
 
     const { next } = this.db.query<{ next: number }, []>("SELECT COALESCE(MAX(position), 0) + 1 AS next FROM pages").get()!;
-    const blocks: Block[] = [{ id: crypto.randomUUID(), type: "heading", text: cleanTitle }];
+    const blocks: Block[] = [{ id: crypto.randomUUID(), type: "heading", text: cleanTitle, level: 1 }];
     if (kind === "post") blocks.push({ id: crypto.randomUUID(), type: "text", text: "" });
     this.insert(slug, { title: cleanTitle, blocks, kind }, next);
     const page = this.get(slug)!;
@@ -304,7 +304,7 @@ const defaultSite: SiteSettings = { name: "Meine Website", description: "" };
 const homePage: { title: string; blocks: Block[] } = {
   title: "Willkommen bei Theta",
   blocks: [
-    { id: "welcome-heading", type: "heading", text: "Willkommen bei Theta" },
+    { id: "welcome-heading", type: "heading", text: "Willkommen bei Theta", level: 1 },
     {
       id: "welcome-text",
       type: "text",
@@ -312,6 +312,6 @@ const homePage: { title: string; blocks: Block[] } = {
         "Das ist deine erste Seite. Öffne /edit, klick auf diesen Text und schreib einfach los.\n\n" +
         "Farben, Schriften und Abstände kommen aus dem Theme. Du kümmerst dich nur um den Inhalt, und die Seite sieht trotzdem immer stimmig aus.",
     },
-    { id: "welcome-image", type: "image", src: "/media/theta.svg", alt: "Das griechische Zeichen Theta" },
+    { id: "welcome-image", type: "image", src: "/media/theta.svg", alt: "Das griechische Zeichen Theta", caption: "", width: "normal" },
   ],
 };

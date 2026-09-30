@@ -89,6 +89,20 @@
   display: flex;
 }
 
+.theta-controls select {
+  font: inherit;
+  padding: 0.2rem 0.3rem;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--t-color-muted) 35%, transparent);
+  background: var(--t-color-bg);
+  color: var(--t-color-text);
+}
+
+.t-image figcaption .theta-editable {
+  display: inline-block;
+  min-width: 16ch;
+}
+
 .theta-block-label {
   margin-right: 0.25rem;
   color: var(--t-color-muted);
