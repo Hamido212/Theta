@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { type Block, HOME, type NavItem, type Page, type SiteSettings, ValidationError, parseBlocks } from "./blocks";
+import { type ThemeSettings, defaultTheme, parseTheme } from "./theme/tokens";
 
 type PageRow = {
   slug: string;
@@ -93,8 +94,23 @@ export class SettingsStore {
   constructor(private db: Database) {}
 
   site(): SiteSettings {
-    const row = this.db.query<{ value: string }, []>("SELECT value FROM settings WHERE key = 'site'").get();
-    return { ...defaultSite, ...(row ? (JSON.parse(row.value) as Partial<SiteSettings>) : {}) };
+    return { ...defaultSite, ...(this.get("site") as Partial<SiteSettings> | null) };
+  }
+
+  theme(): ThemeSettings {
+    const stored = this.get("theme");
+    if (!stored) return defaultTheme();
+    try {
+      return parseTheme({ ...defaultTheme(), ...stored });
+    } catch {
+      return defaultTheme();
+    }
+  }
+
+  saveTheme(input: Record<string, unknown>): ThemeSettings {
+    const theme = parseTheme(input);
+    this.set("theme", theme);
+    return theme;
   }
 
   saveSite(input: { name: unknown; description: unknown }): SiteSettings {
@@ -102,10 +118,19 @@ export class SettingsStore {
       name: text(input.name, "Name", 1, 100),
       description: text(input.description, "Beschreibung", 0, 300),
     };
-    this.db
-      .query("INSERT INTO settings (key, value) VALUES ('site', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
-      .run(JSON.stringify(site));
+    this.set("site", site);
     return site;
+  }
+
+  private get(key: string): Record<string, unknown> | null {
+    const row = this.db.query<{ value: string }, [string]>("SELECT value FROM settings WHERE key = ?").get(key);
+    return row ? (JSON.parse(row.value) as Record<string, unknown>) : null;
+  }
+
+  private set(key: string, value: object) {
+    this.db
+      .query("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+      .run(key, JSON.stringify(value));
   }
 }
 
