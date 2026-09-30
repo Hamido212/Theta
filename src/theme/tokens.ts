@@ -5,18 +5,63 @@ import { ValidationError } from "../blocks";
 
 type Palette = { bg: string; text: string; muted: string };
 
-// Only fonts already on the visitor's device: nothing is downloaded from font services.
+// System fonts are already on the visitor's device. The bundled fonts (SIL Open Font License,
+// in ./fonts) are served by the site itself: nothing is ever loaded from font services, and
+// a visitor only downloads the fonts the chosen theme uses.
 const SANS = 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+const SERIF = 'ui-serif, Georgia, "Times New Roman", serif';
 const CLASSIC = '"Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif';
 const ROUNDED = 'ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", system-ui, sans-serif';
 
-export const FONTS = {
-  "serif-headings": { label: "Serifen-Überschriften", heading: 'ui-serif, Georgia, "Times New Roman", serif', body: SANS },
-  system: { label: "Modern und schlicht", heading: SANS, body: SANS },
-  classic: { label: "Klassisch", heading: CLASSIC, body: CLASSIC },
-  rounded: { label: "Rund und freundlich", heading: ROUNDED, body: ROUNDED },
-  "mono-headings": { label: "Technisch", heading: 'ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace', body: SANS },
+export const WEB_FONTS = {
+  inter: { family: "Inter", weight: "100 900" },
+  fraunces: { family: "Fraunces", weight: "100 900" },
+  lora: { family: "Lora", weight: "400 700" },
+  "space-grotesk": { family: "Space Grotesk", weight: "300 700" },
 } as const;
+export type WebFont = keyof typeof WEB_FONTS;
+
+// Each font is split like the fonts themselves: basic Latin (enough for German and English)
+// and extended Latin, which browsers only fetch when a page uses such letters.
+const SUBSETS = {
+  latin:
+    "U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD",
+  "latin-ext":
+    "U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF",
+};
+
+type FontChoice = { label: string; heading: string; body: string; web: readonly WebFont[] };
+
+const stack = (font: WebFont, fallback: string) => `"${WEB_FONTS[font].family}", ${fallback}`;
+
+export const FONTS = {
+  "serif-headings": { label: "Serifen-Überschriften", heading: SERIF, body: SANS, web: [] },
+  system: { label: "Modern und schlicht", heading: SANS, body: SANS, web: [] },
+  classic: { label: "Klassisch", heading: CLASSIC, body: CLASSIC, web: [] },
+  rounded: { label: "Rund und freundlich", heading: ROUNDED, body: ROUNDED, web: [] },
+  "mono-headings": { label: "Technisch", heading: 'ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace', body: SANS, web: [] },
+  inter: { label: "Inter: modern", heading: stack("inter", SANS), body: stack("inter", SANS), web: ["inter"] },
+  elegant: { label: "Fraunces und Inter: elegant", heading: stack("fraunces", SERIF), body: stack("inter", SANS), web: ["fraunces", "inter"] },
+  book: { label: "Lora: warm, gut lesbar", heading: stack("lora", CLASSIC), body: stack("lora", CLASSIC), web: ["lora"] },
+  grotesk: { label: "Space Grotesk und Inter: markant", heading: stack("space-grotesk", SANS), body: stack("inter", SANS), web: ["space-grotesk", "inter"] },
+} satisfies Record<string, FontChoice>;
+
+// File names of a bundled font, relative to /assets/fonts/.
+export const fontFiles = (font: WebFont) => (Object.keys(SUBSETS) as (keyof typeof SUBSETS)[]).map((subset) => `${font}-${subset}.woff2`);
+
+export const isFontFile = (name: string) => (Object.keys(WEB_FONTS) as WebFont[]).some((font) => fontFiles(font).includes(name));
+
+// The @font-face rules for the bundled fonts a theme uses.
+export function fontFaces(fonts: readonly WebFont[]): string {
+  return fonts
+    .flatMap((font) =>
+      (Object.entries(SUBSETS) as [keyof typeof SUBSETS, string][]).map(
+        ([subset, range]) =>
+          `@font-face{font-family:"${WEB_FONTS[font].family}";font-style:normal;font-display:swap;font-weight:${WEB_FONTS[font].weight};src:url(/assets/fonts/${font}-${subset}.woff2) format("woff2");unicode-range:${range}}`,
+      ),
+    )
+    .join("");
+}
 
 export const SPACING = { compact: { label: "Kompakt", value: "1.1rem" }, normal: { label: "Normal", value: "1.5rem" }, airy: { label: "Luftig", value: "2.1rem" } } as const;
 export const RADIUS = {
@@ -66,6 +111,13 @@ export const PRESETS = {
     light: { bg: "#fdf6ec", text: "#2b2118", muted: "#7a6a58" },
     dark: { bg: "#1f1812", text: "#f3e9dc", muted: "#b3a390" },
     defaults: { accent: "#c2410c", fonts: "classic", spacing: "airy", radius: "round", width: "narrow", colorScheme: "auto" },
+  },
+  studio: {
+    label: "Studio",
+    description: "Markante Überschriften, viel Weißraum, kräftige Farbe. Gut für Agenturen, Kreative und Portfolios.",
+    light: { bg: "#f7f7f4", text: "#111111", muted: "#5c5c57" },
+    dark: { bg: "#111111", text: "#f2f2ee", muted: "#a3a39c" },
+    defaults: { accent: "#6d28d9", fonts: "grotesk", spacing: "airy", radius: "soft", width: "wide", colorScheme: "auto" },
   },
 } satisfies Record<string, Preset>;
 
@@ -120,9 +172,11 @@ export function themeCss(theme: ThemeSettings): string {
   const lightBands = bands(preset.light, lightAccent, preset.dark, nightAccent);
   const darkBands = bands(preset.dark, nightAccent, preset.light, lightAccent);
 
-  if (theme.colorScheme === "light") return root([...shared, ...light, "color-scheme: light"]) + lightBands;
-  if (theme.colorScheme === "dark") return root([...shared, ...dark, "color-scheme: dark"]) + darkBands;
-  return `${root([...shared, ...light, "color-scheme: light dark"])}${lightBands}@media (prefers-color-scheme: dark){${root(dark)}${darkBands}}`;
+  const faces = fontFaces(fonts.web);
+
+  if (theme.colorScheme === "light") return faces + root([...shared, ...light, "color-scheme: light"]) + lightBands;
+  if (theme.colorScheme === "dark") return faces + root([...shared, ...dark, "color-scheme: dark"]) + darkBands;
+  return `${faces}${root([...shared, ...light, "color-scheme: light dark"])}${lightBands}@media (prefers-color-scheme: dark){${root(dark)}${darkBands}}`;
 }
 
 function colors(palette: Palette, accent: string): string[] {

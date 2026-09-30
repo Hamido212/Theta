@@ -3,12 +3,25 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { User } from "../auth";
 import { HOME, type Page, type SiteSettings, editPath, formatDate, pagePath, publicPath } from "../blocks";
 import type { MediaItem } from "../media";
-import { FONTS, PRESETS, type PresetId, RADIUS, SCHEMES, SPACING, type ThemeSettings, WIDTH, accentWarnings } from "../theme/tokens";
+import {
+  FONTS,
+  PRESETS,
+  type PresetId,
+  RADIUS,
+  SCHEMES,
+  SPACING,
+  type ThemeSettings,
+  WEB_FONTS,
+  type WebFont,
+  WIDTH,
+  accentWarnings,
+  fontFaces,
+} from "../theme/tokens";
 import { pageTemplates } from "../templates";
 
 // Server-rendered admin screens. They work without JavaScript: plain forms that post back.
 
-function AdminHead({ title }: { title: string }) {
+function AdminHead({ title, head }: { title: string; head?: ReactNode }) {
   return (
     <head>
       <meta charSet="utf-8" />
@@ -17,6 +30,7 @@ function AdminHead({ title }: { title: string }) {
       <title>{`${title} · Theta`}</title>
       <link rel="icon" href="/media/favicon.svg" type="image/svg+xml" />
       <link rel="stylesheet" href="/assets/admin.css" />
+      {head}
     </head>
   );
 }
@@ -469,7 +483,7 @@ export function renderDesign({ user, theme, error }: { user: User; theme: ThemeS
   const warnings = accentWarnings(theme);
   return html(
     <html lang="de">
-      <AdminHead title="Design" />
+      <AdminHead title="Design" head={<style dangerouslySetInnerHTML={{ __html: fontFaces(Object.keys(WEB_FONTS) as WebFont[]) }} />} />
       <body>
         <AdminBar user={user} current="design" />
         <main className="a-main a-main-wide">
@@ -518,7 +532,10 @@ export function renderDesign({ user, theme, error }: { user: User; theme: ThemeS
               ))}
               <button className="a-primary">Speichern</button>
             </form>
-            <p className="a-muted">Schriften kommen vom Gerät der Besucher. Es werden keine Schriften von fremden Servern geladen.</p>
+            <p className="a-muted">
+              Inter, Fraunces, Lora und Space Grotesk liefert deine Website selbst aus, sie sehen auf jedem Gerät gleich aus. Die übrigen Schriften kommen vom
+              Gerät der Besucher. Es werden nie Schriften von fremden Servern geladen.
+            </p>
           </section>
 
           <section className="a-section">

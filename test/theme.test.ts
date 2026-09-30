@@ -1,16 +1,27 @@
 import { describe, expect, test } from "bun:test";
 import { ValidationError } from "../src/blocks";
 import { accentWarnings, contrast, darkAccent, defaultTheme, parseTheme, readableOn, themeCss } from "../src/theme/tokens";
+import { exportSite } from "../src/export";
 import { form, testSite } from "./helpers";
 
 describe("tokens", () => {
   test("each preset produces light and dark tokens", () => {
-    for (const preset of ["klar", "modern", "warm"] as const) {
+    for (const preset of ["klar", "modern", "warm", "studio"] as const) {
       const css = themeCss(defaultTheme(preset));
       expect(css).toContain("--t-color-accent:");
       expect(css).toContain("--t-font-heading:");
       expect(css).toContain("@media (prefers-color-scheme: dark)");
     }
+  });
+
+  test("bundled fonts are declared only when the theme uses them", () => {
+    expect(themeCss(defaultTheme("klar"))).not.toContain("@font-face");
+    const css = themeCss({ ...defaultTheme("klar"), fonts: "elegant" });
+    expect(css.match(/@font-face/g)).toHaveLength(4);
+    expect(css).toContain("url(/assets/fonts/fraunces-latin.woff2)");
+    expect(css).toContain('--t-font-heading: "Fraunces", ui-serif');
+    expect(css).toContain('--t-font-body: "Inter", ui-sans-serif');
+    expect(css).not.toContain("fonts.googleapis");
   });
 
   test("a fixed colour scheme uses only that palette", () => {
@@ -92,5 +103,31 @@ describe("design page", () => {
     expect(res.status).toBe(400);
     expect(await res.text()).toContain("Akzentfarbe");
     expect(settings.theme()).toEqual(defaultTheme());
+  });
+});
+
+describe("bundled fonts", () => {
+  test("are served from the site itself, other names are not", async () => {
+    const { request } = await testSite();
+    const font = await request("/assets/fonts/inter-latin.woff2");
+    expect(font.status).toBe(200);
+    expect(font.headers.get("content-type")).toBe("font/woff2");
+    expect((await font.arrayBuffer()).byteLength).toBeGreaterThan(10_000);
+    expect((await request("/assets/fonts/inter-LICENSE.txt")).status).toBe(404);
+    expect((await request("/assets/fonts/..%2F..%2Fserver.ts")).status).toBe(404);
+  });
+
+  test("the static export contains exactly the fonts in use", async () => {
+    const site = await testSite();
+    const without = await exportSite(site, "https://example.com");
+    expect([...without.keys()].filter((name) => name.startsWith("assets/fonts/"))).toEqual([]);
+    site.settings.saveTheme({ ...defaultTheme("studio") });
+    const files = await exportSite(site, "https://example.com");
+    expect([...files.keys()].filter((name) => name.startsWith("assets/fonts/")).sort()).toEqual([
+      "assets/fonts/inter-latin-ext.woff2",
+      "assets/fonts/inter-latin.woff2",
+      "assets/fonts/space-grotesk-latin-ext.woff2",
+      "assets/fonts/space-grotesk-latin.woff2",
+    ]);
   });
 });
