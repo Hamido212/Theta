@@ -54,7 +54,7 @@ export function pageTitle(page: Page, site: SiteSettings) {
 // The first picture on a page, used for link previews and as a post's cover in the blog.
 function coverImage(page: Page): { src: string; alt: string } | undefined {
   for (const block of page.blocks) {
-    if (block.type === "image" && block.src) return block;
+    if ((block.type === "image" || block.type === "hero") && block.src) return block;
     if (block.type === "gallery" && block.images[0]?.src) return block.images[0];
   }
 }

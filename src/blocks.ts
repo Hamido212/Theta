@@ -15,6 +15,12 @@ export type ColumnsBlock = { id: string; type: "columns"; items: { title: string
 export type VideoBlock = { id: string; type: "video"; url: string; title: string };
 export type QuoteBlock = { id: string; type: "quote"; text: string; cite: string };
 export type DividerBlock = { id: string; type: "divider" };
+// Starts a new full-width band of the page. Everything up to the next section shares its background.
+export type SectionBackground = "plain" | "soft" | "accent" | "inverse";
+export type SectionBlock = { id: string; type: "section"; background: SectionBackground };
+// A large picture across the whole window with the page title, a sentence and up to two buttons on top.
+export type HeroButton = { label: string; href: string };
+export type HeroBlock = { id: string; type: "hero"; title: string; text: string; src: string; alt: string; buttons: HeroButton[] };
 
 export type Block =
   | HeadingBlock
@@ -25,7 +31,9 @@ export type Block =
   | ColumnsBlock
   | VideoBlock
   | QuoteBlock
-  | DividerBlock;
+  | DividerBlock
+  | SectionBlock
+  | HeroBlock;
 export type BlockType = Block["type"];
 
 export type PageKind = "page" | "post";
@@ -92,7 +100,18 @@ export const blockLabels: Record<BlockType, string> = {
   video: "Video",
   quote: "Zitat",
   divider: "Trenner",
+  section: "Abschnitt",
+  hero: "Titelbild",
 };
+
+export const sectionBackgrounds: Record<SectionBackground, string> = {
+  plain: "Normal",
+  soft: "Getönt",
+  accent: "Akzentfarbe",
+  inverse: "Kontrast",
+};
+
+export const MAX_HERO_BUTTONS = 2;
 
 export const MAX_COLUMNS = 4;
 export const MAX_GALLERY_IMAGES = 60;
@@ -117,8 +136,14 @@ export function newBlock(type: BlockType, id: string = crypto.randomUUID()): Blo
       return { id, type, text: "", cite: "" };
     case "divider":
       return { id, type };
+    case "section":
+      return { id, type, background: "soft" };
+    case "hero":
+      return { id, type, title: "", text: "", src: "", alt: "", buttons: [emptyHeroButton()] };
   }
 }
+
+export const emptyHeroButton = (): HeroButton => ({ label: "", href: "" });
 
 export const emptyColumn = () => ({ title: "", text: "" });
 
@@ -167,12 +192,8 @@ export function parseBlocks(input: unknown): Block[] {
         return { id, type: "gallery", images: images.map((item, i) => image(object(item, `${where}.images[${i}]`), `${where}.images[${i}]`)) };
       }
       case "button": {
-        const href = string(value.href, `${where}.href`, 2_000).trim();
-        if (href !== "" && !isSafeHref(href)) {
-          throw new ValidationError(`${where}.href muss mit https://, http://, mailto:, tel: oder / beginnen`);
-        }
         const variant = value.variant === "secondary" ? "secondary" : "primary";
-        return { id, type: "button", label: string(value.label, `${where}.label`, 200), href, variant };
+        return { id, type: "button", label: string(value.label, `${where}.label`, 200), href: href(value.href, `${where}.href`), variant };
       }
       case "columns": {
         const items = list(value.items, `${where}.items`, MAX_COLUMNS);
@@ -196,6 +217,17 @@ export function parseBlocks(input: unknown): Block[] {
         return { id, type: "quote", text: string(value.text, `${where}.text`), cite: string(value.cite, `${where}.cite`, 500) };
       case "divider":
         return { id, type: "divider" };
+      case "section":
+        return { id, type: "section", background: Object.hasOwn(sectionBackgrounds, value.background as string) ? (value.background as SectionBackground) : "plain" };
+      case "hero": {
+        // The hero's title is the page title.
+        hasTitle = true;
+        const buttons = list(value.buttons, `${where}.buttons`, MAX_HERO_BUTTONS).map((item, i) => {
+          const button = object(item, `${where}.buttons[${i}]`);
+          return { label: string(button.label, `${where}.buttons[${i}].label`, 200), href: href(button.href, `${where}.buttons[${i}].href`) };
+        });
+        return { id, type: "hero", title: string(value.title, `${where}.title`, 500), text: string(value.text, `${where}.text`, 2_000), ...image(value, where), buttons };
+      }
       default:
         throw new ValidationError(`${where}: unbekannter Typ ${JSON.stringify(value.type)}`);
     }
@@ -216,6 +248,14 @@ function image(value: Record<string, unknown>, where: string) {
     throw new ValidationError(`${where}.src muss mit https://, http:// oder / beginnen`);
   }
   return { src, alt: string(value.alt, `${where}.alt`, 500) };
+}
+
+function href(value: unknown, field: string): string {
+  const link = string(value, field, 2_000).trim();
+  if (link !== "" && !isSafeHref(link)) {
+    throw new ValidationError(`${field} muss mit https://, http://, mailto:, tel: oder / beginnen`);
+  }
+  return link;
 }
 
 function headingLevel(value: unknown, field: string): HeadingLevel {

@@ -342,3 +342,15 @@
   background: color-mix(in srgb, var(--t-color-accent) 14%, transparent);
   font: 0.9rem/1.4 var(--t-font-body);
 }
+
+.t-section-marker {
+  padding: 0.3rem 0;
+  border-top: 2px dashed color-mix(in srgb, var(--t-color-text) 35%, transparent);
+  color: var(--t-color-text);
+  font: 0.8rem/1.2 var(--t-font-body);
+  opacity: 0.7;
+}
+
+.t-hero .t-button .theta-editable {
+  min-width: 6ch;
+}
