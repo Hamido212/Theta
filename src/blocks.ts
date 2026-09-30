@@ -85,6 +85,13 @@ export function excerpt(page: Page): string {
 export type SiteSettings = {
   name: string;
   description: string;
+  // Address of an uploaded logo shown in the header instead of the name; empty for none.
+  logo: string;
+  // Formatted text for the footer, e.g. address, opening hours and social links.
+  footer: string;
+  // Pages linked in the footer as legal notice (Impressum) and privacy policy; empty for none.
+  imprint: string;
+  privacy: string;
 };
 
 // href overrides the address for entries that are not pages, such as the blog.

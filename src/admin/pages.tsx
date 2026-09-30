@@ -26,7 +26,7 @@ function AdminDocument({ title, children }: { title: string; children: ReactNode
       <AdminHead title={title} />
       <body className="a-centered">
         <main className="a-card">
-          <p className="a-logo">θ Theta</p>
+          <p className="a-logo-choice">θ Theta</p>
           <h1>{title}</h1>
           {children}
         </main>
@@ -134,9 +134,27 @@ function AdminBar({ user, current }: { user: User; current: "pages" | "blog" | "
   );
 }
 
-type DashboardProps = { user: User; pages: Page[]; site: SiteSettings; origin: string; error?: string };
+type DashboardProps = { user: User; pages: Page[]; site: SiteSettings; media: MediaItem[]; origin: string; error?: string };
 
-export function renderDashboard({ user, pages, site, origin, error }: DashboardProps) {
+function PageChoice({ name, label, value, pages }: { name: string; label: string; value: string; pages: Page[] }) {
+  return (
+    <label>
+      {label}
+      <select name={name} defaultValue={value}>
+        <option value="">Keine</option>
+        {pages
+          .filter((page) => page.slug !== HOME)
+          .map((page) => (
+            <option key={page.slug} value={page.slug}>
+              {page.title}
+            </option>
+          ))}
+      </select>
+    </label>
+  );
+}
+
+export function renderDashboard({ user, pages, site, media, origin, error }: DashboardProps) {
   const movable = pages.filter((page) => page.slug !== HOME);
   return html(
     <html lang="de">
@@ -160,7 +178,13 @@ export function renderDashboard({ user, pages, site, origin, error }: DashboardP
                       </a>
                       <span className="a-muted">
                         {publicPath(page.slug)}
-                        {page.slug === HOME ? " · Startseite" : page.inNav ? " · im Menü" : " · nicht im Menü"}
+                        {page.slug === HOME
+                          ? " · Startseite"
+                          : page.slug === site.imprint || page.slug === site.privacy
+                            ? " · in der Fußzeile"
+                            : page.inNav
+                              ? " · im Menü"
+                              : " · nicht im Menü"}
                       </span>
                     </div>
                     {page.slug !== HOME && (
@@ -210,6 +234,45 @@ export function renderDashboard({ user, pages, site, origin, error }: DashboardP
                 Kurzbeschreibung für Suchmaschinen
                 <textarea name="description" maxLength={300} rows={2} defaultValue={site.description} />
               </label>
+              <fieldset className="a-logos">
+                <legend>Logo (erscheint oben statt des Namens und als Symbol im Browser-Tab)</legend>
+                <label className="a-logo-choice">
+                  <input type="radio" name="logo" value="" defaultChecked={site.logo === ""} />
+                  <span>Kein Logo, Name als Text</span>
+                </label>
+                {media.map((item) => (
+                  <label key={item.id} className="a-logo-choice">
+                    <input type="radio" name="logo" value={item.url} defaultChecked={site.logo === item.url} />
+                    <img src={item.thumb} alt={item.filename} />
+                  </label>
+                ))}
+                {media.length === 0 && (
+                  <p className="a-muted">
+                    Lade dein Logo zuerst in der <a href="/admin/media">Mediathek</a> hoch.
+                  </p>
+                )}
+              </fieldset>
+              <label>
+                Fußzeile
+                <textarea
+                  name="footer"
+                  maxLength={2000}
+                  rows={4}
+                  defaultValue={site.footer}
+                  placeholder={"Zum Beispiel Adresse, Öffnungszeiten und Links:\nKarl-Heine-Straße 1, 04229 Leipzig\n[Instagram](https://instagram.com/…)"}
+                />
+                <small className="a-muted">**fett**, *kursiv* und [Linktext](https://…) sind möglich.</small>
+              </label>
+              <div className="a-pair">
+                <PageChoice name="imprint" label="Impressum" value={site.imprint} pages={pages} />
+                <PageChoice name="privacy" label="Datenschutzerklärung" value={site.privacy} pages={pages} />
+              </div>
+              {!site.imprint && (
+                <p className="a-warning">
+                  Geschäftliche Websites brauchen in Deutschland ein Impressum. Lege dafür eine Seite an und wähle sie hier aus;
+                  sie erscheint dann unten auf jeder Seite. Im Hauptmenü muss sie nicht stehen.
+                </p>
+              )}
               <button className="a-primary">Speichern</button>
             </form>
           </section>

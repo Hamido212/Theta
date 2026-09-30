@@ -210,12 +210,67 @@ body {
   text-underline-offset: 6px;
 }
 
+.t-brand img {
+  display: block;
+  height: 2.5rem;
+  width: auto;
+  max-width: 12rem;
+  object-fit: contain;
+}
+
 .t-footer {
+  margin-top: calc(var(--t-space) * 2);
+  border-top: 1px solid color-mix(in srgb, var(--t-color-muted) 25%, transparent);
+  color: var(--t-color-muted);
+  font-size: 0.95rem;
+}
+
+.t-footer-main,
+.t-footer-copy {
   max-width: var(--t-measure);
   margin: 0 auto;
-  padding: var(--t-space);
-  color: var(--t-color-muted);
-  font-size: 0.875rem;
+  padding: calc(var(--t-space) * 1.5) var(--t-space) 0;
+}
+
+.t-footer-main {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--t-space) calc(var(--t-space) * 2);
+}
+
+.t-footer-name {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: var(--t-color-text);
+  font-family: var(--t-font-heading);
+  font-size: 1.05rem;
+}
+
+.t-footer .t-text p {
+  margin-bottom: 0.6em;
+}
+
+.t-footer-links {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.t-footer a {
+  color: inherit;
+}
+
+.t-footer a:hover {
+  color: var(--t-color-accent);
+}
+
+.t-footer-copy {
+  margin-bottom: 0;
+  padding-bottom: var(--t-space);
+  font-size: 0.85rem;
 }
 
 .t-gallery {
@@ -423,6 +478,11 @@ a.t-button:hover {
 
 .t-page > .t-band:last-child {
   margin-bottom: calc(var(--t-space) * -2);
+}
+
+.t-page:has(> .t-band:last-child) + .t-footer {
+  margin-top: 0;
+  border-top: 0;
 }
 
 .t-hero {

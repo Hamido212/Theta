@@ -9,6 +9,8 @@ import { SiteFrame } from "./theme/layout";
 export type SiteContext = {
   site: SiteSettings;
   nav: NavItem[];
+  // Legal notice and privacy links for the footer.
+  legal?: NavItem[];
   // Absolute base address, e.g. https://example.com, for canonical links and the sitemap.
   origin: string;
   // Size and smaller copies of uploaded images.
@@ -22,20 +24,21 @@ export type EditorData = {
   page: Page;
   site: SiteSettings;
   nav: NavItem[];
+  legal: NavItem[];
   // All pages, offered as link targets.
   pages: NavItem[];
 };
 
-type DocumentProps = { title: string; themeCss?: string; head?: ReactNode; children: ReactNode };
+type DocumentProps = { title: string; themeCss?: string; icon?: string; head?: ReactNode; children: ReactNode };
 
-function Document({ title, themeCss, head, children }: DocumentProps) {
+function Document({ title, themeCss, icon, head, children }: DocumentProps) {
   return (
     <html lang="de">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>{title}</title>
-        <link rel="icon" href="/media/favicon.svg" type="image/svg+xml" />
+        {icon ? <link rel="icon" href={icon} /> : <link rel="icon" href="/media/favicon.svg" type="image/svg+xml" />}
         <link rel="stylesheet" href="/assets/theme.css" />
         {themeCss && <style dangerouslySetInnerHTML={{ __html: themeCss }} />}
         {head}
@@ -98,12 +101,13 @@ function PostDate({ page }: { page: Page }) {
 }
 
 // Public page: plain HTML and CSS, no JavaScript at all.
-export function renderPage(page: Page, { site, nav, origin, images = () => null, themeCss }: SiteContext): string {
+export function renderPage(page: Page, { site, nav, legal = [], origin, images = () => null, themeCss }: SiteContext): string {
   const post = page.kind === "post";
   return html(
     <Document
       title={pageTitle(page, site)}
       themeCss={themeCss}
+      icon={site.logo}
       head={
         <>
           <SeoTags page={page} site={site} origin={origin} />
@@ -112,7 +116,7 @@ export function renderPage(page: Page, { site, nav, origin, images = () => null,
       }
     >
       <ImageLookupContext.Provider value={images}>
-        <SiteFrame site={site} nav={nav} current={post ? BLOG : page.slug} linkTo={publicPath}>
+        <SiteFrame site={site} nav={nav} legal={legal} current={post ? BLOG : page.slug} linkTo={publicPath}>
           {post && <PostDate page={page} />}
           <BlockFlow blocks={page.blocks}>{(block) => <BlockView key={block.id} block={block} />}</BlockFlow>
           {post && (
@@ -127,12 +131,13 @@ export function renderPage(page: Page, { site, nav, origin, images = () => null,
 }
 
 // The blog's front page: every published post, newest first.
-export function renderBlogIndex(posts: Page[], { site, nav, origin, images = () => null, themeCss }: SiteContext): string {
+export function renderBlogIndex(posts: Page[], { site, nav, legal = [], origin, images = () => null, themeCss }: SiteContext): string {
   const url = new URL(`/${BLOG}`, origin).href;
   return html(
     <Document
       title={`Blog · ${site.name}`}
       themeCss={themeCss}
+      icon={site.logo}
       head={
         <>
           <link rel="canonical" href={url} />
@@ -145,7 +150,7 @@ export function renderBlogIndex(posts: Page[], { site, nav, origin, images = () 
       }
     >
       <ImageLookupContext.Provider value={images}>
-        <SiteFrame site={site} nav={nav} current={BLOG} linkTo={publicPath}>
+        <SiteFrame site={site} nav={nav} legal={legal} current={BLOG} linkTo={publicPath}>
           <h1 className="t-heading t-heading-1">Blog</h1>
           {posts.length === 0 ? (
             <div className="t-text">
@@ -211,10 +216,10 @@ ${items}
 `;
 }
 
-export function renderNotFound({ site, nav, themeCss }: SiteContext): string {
+export function renderNotFound({ site, nav, legal = [], themeCss }: SiteContext): string {
   return html(
     <Document title={`Seite nicht gefunden · ${site.name}`} themeCss={themeCss} head={<meta name="robots" content="noindex" />}>
-      <SiteFrame site={site} nav={nav} current="" linkTo={publicPath}>
+      <SiteFrame site={site} nav={nav} legal={legal} current="" linkTo={publicPath}>
         <h1 className="t-heading t-heading-1">Seite nicht gefunden</h1>
         <div className="t-text">
           <p>
@@ -234,6 +239,7 @@ export function renderEditor(data: EditorData, themeCss?: string): string {
     <Document
       title={`${data.page.title} bearbeiten`}
       themeCss={themeCss}
+      icon={data.site.logo}
       head={
         <>
           <meta name="robots" content="noindex" />
