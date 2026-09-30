@@ -1,14 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { type Block, ValidationError, newBlock, parseBlocks } from "../src/blocks";
+import { type Block, type BlockType, ValidationError, newBlock, parseBlocks } from "../src/blocks";
 import { BlockFlow, BlockView } from "../src/theme/blocks";
 import { videoSource } from "../src/theme/video";
 
+const newBlockOf = (type: BlockType) => newBlock(type, "x");
 const render = (block: Block) => renderToStaticMarkup(<BlockView block={block} />);
 
 describe("parsing", () => {
   test("every new block type starts out valid", () => {
-    for (const type of ["gallery", "button", "columns", "video", "quote", "divider", "section", "hero"] as const) {
+    for (const type of ["gallery", "button", "columns", "video", "quote", "divider", "section", "hero", "prices", "faq", "hours", "team"] as const) {
       const block = newBlock(type, "x");
       expect(parseBlocks([block])).toEqual([block]);
     }
@@ -21,6 +22,9 @@ describe("parsing", () => {
     ["gallery image with unsafe address", { type: "gallery", images: [{ src: "data:text/html,x", alt: "" }] }],
     ["video with unsafe address", { type: "video", url: "javascript:alert(1)", title: "" }],
     ["hero button with javascript link", { type: "hero", title: "", text: "", src: "", alt: "", buttons: [{ label: "Los", href: "javascript:alert(1)" }] }],
+    ["price entry without a price field", { type: "prices", items: [{ name: "Kaffee", description: "" }] }],
+    ["team photo with unsafe address", { type: "team", members: [{ name: "Ana", role: "", text: "", src: "javascript:x", alt: "" }] }],
+    ["too many opening hours", { type: "hours", note: "", rows: Array.from({ length: 15 }, () => ({ days: "", time: "" })) }],
     ["hero with three buttons", { type: "hero", title: "", text: "", src: "", alt: "", buttons: Array.from({ length: 3 }, () => ({ label: "", href: "" })) }],
   ])("rejects %s", (_, block) => {
     expect(() => parseBlocks([{ id: "x", ...block }])).toThrow(ValidationError);
@@ -194,5 +198,68 @@ describe("cards and gallery layout", () => {
     expect(block).toMatchObject({ columns: 3, crop: false });
     const html = render({ id: "g", type: "gallery", images: [{ src: "/a.jpg", alt: "" }], columns: 2, crop: true });
     expect(html).toContain('class="t-gallery t-gallery-crop" style="--t-gallery-columns:2"');
+  });
+});
+
+describe("price list, questions, opening hours and team", () => {
+  test("price lists skip empty entries and keep the description", () => {
+    const html = render({
+      id: "p",
+      type: "prices",
+      items: [
+        { name: "Cappuccino", description: "mit Hafermilch", price: "3,40 €" },
+        { name: " ", description: "", price: "" },
+      ],
+    });
+    expect(html.match(/<li>/g)).toHaveLength(1);
+    expect(html).toContain('<span class="t-price">3,40 €</span>');
+    expect(html).toContain("mit Hafermilch");
+    expect(render({ id: "p", type: "prices", items: [{ name: "", description: "", price: "" }] })).toBe("");
+  });
+
+  test("questions open without JavaScript and need an answer to show", () => {
+    const html = render({
+      id: "f",
+      type: "faq",
+      items: [
+        { question: "Kann ich reservieren?", answer: "Ja, **telefonisch**." },
+        { question: "Ohne Antwort?", answer: "" },
+      ],
+    });
+    expect(html).toContain('<details class="t-faq-item"><summary class="t-faq-question">Kann ich reservieren?</summary>');
+    expect(html).toContain("<strong>telefonisch</strong>");
+    expect(html).not.toContain("Ohne Antwort");
+    expect(html).not.toContain("<script");
+  });
+
+  test("opening hours show complete rows and the note", () => {
+    const html = render({
+      id: "h",
+      type: "hours",
+      rows: [
+        { days: "Montag bis Freitag", time: "8 bis 18 Uhr" },
+        { days: "Samstag", time: "" },
+      ],
+      note: "An Feiertagen geschlossen",
+    });
+    expect(html).toContain("<dt>Montag bis Freitag</dt><dd>8 bis 18 Uhr</dd>");
+    expect(html).not.toContain("Samstag");
+    expect(html).toContain("An Feiertagen geschlossen");
+    expect(render(newBlockOf("hours"))).toContain("Sonntag");
+  });
+
+  test("team members need a name; photos are optional", () => {
+    const member = { name: "Ana Petrović", role: "Inhaberin", text: "", src: "/a.jpg", alt: "Ana lacht" };
+    const html = render({ id: "t", type: "team", members: [member, { ...member, name: "", src: "" }, { ...member, name: "Ben", src: "" }] });
+    expect(html.match(/<li/g)).toHaveLength(2);
+    expect(html.match(/<img/g)).toHaveLength(1);
+    expect(html).toContain('<h3 class="t-member-name">Ana Petrović</h3>');
+    expect(html).not.toContain("t-member-text");
+  });
+
+  test("error messages name the entry", () => {
+    expect(() => parseBlocks([{ id: "p", type: "prices", items: [{ name: "A", description: "", price: 3 }] }])).toThrow(
+      "Block 1 (Preisliste), Eintrag 1: Der Preis muss Text sein",
+    );
   });
 });

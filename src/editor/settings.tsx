@@ -19,7 +19,20 @@ import {
   type VideoBlock,
   emptyColumn,
   publicPath,
+  type FaqBlock,
+  type HoursBlock,
+  type PricesBlock,
+  type TeamBlock,
+  type TeamMember,
+  MAX_HOURS_ROWS,
+  MAX_LIST_ITEMS,
+  MAX_TEAM,
+  emptyFaqItem,
+  emptyHoursRow,
+  emptyPriceItem,
+  emptyTeamMember,
 } from "../blocks";
+import type { ReactNode } from "react";
 import { videoSource } from "../theme/video";
 import { MediaPicker } from "./media-picker";
 
@@ -42,6 +55,14 @@ export function BlockSettings({ block, onChange, pages }: Props<Block>) {
       return <VideoSettings block={block} onChange={change} pages={pages} />;
     case "hero":
       return <HeroSettings block={block} onChange={change} pages={pages} />;
+    case "prices":
+      return <PricesSettings block={block} onChange={change} pages={pages} />;
+    case "faq":
+      return <FaqSettings block={block} onChange={change} pages={pages} />;
+    case "hours":
+      return <HoursSettings block={block} onChange={change} pages={pages} />;
+    case "team":
+      return <TeamSettings block={block} onChange={change} pages={pages} />;
     default:
       return null;
   }
@@ -294,5 +315,99 @@ function VideoSettings({ block, onChange }: Props<VideoBlock>) {
         <p className="theta-note">Das Video lädt erst, wenn jemand auf Abspielen klickt. So bleibt die Seite schnell und datenschutzfreundlich.</p>
       )}
     </div>
+  );
+}
+
+type ListProps<T> = {
+  items: T[];
+  onChange: (items: T[]) => void;
+  make: () => T;
+  max: number;
+  // "Eintrag", "Frage", … and the name shown for an entry in the list.
+  noun: string;
+  name: (item: T) => string;
+  // Extra settings for one entry, e.g. its picture.
+  details?: (item: T, update: (patch: Partial<T>) => void, index: number) => ReactNode;
+};
+
+// Adds, removes and reorders the entries of list blocks; their words are edited on the page.
+function ListSettings<T>({ items, onChange, make, max, noun, name, details }: ListProps<T>) {
+  const move = (from: number, to: number) => {
+    const copy = [...items];
+    const [item] = copy.splice(from, 1);
+    copy.splice(to, 0, item!);
+    onChange(copy);
+  };
+  return (
+    <div className="theta-settings">
+      {items.map((item, i) => (
+        <fieldset key={i} className="theta-card-settings">
+          <div className="theta-inline">
+            <span className="theta-list-name">{name(item).trim() || `${noun} ${i + 1}`}</span>
+            <button className="theta-button" onClick={() => move(i, i - 1)} disabled={i === 0} aria-label={`${noun} ${i + 1} nach oben`}>
+              ↑
+            </button>
+            <button className="theta-button" onClick={() => move(i, i + 1)} disabled={i === items.length - 1} aria-label={`${noun} ${i + 1} nach unten`}>
+              ↓
+            </button>
+            <button className="theta-button" onClick={() => onChange(items.filter((_, j) => j !== i))} disabled={items.length <= 1}>
+              Entfernen
+            </button>
+          </div>
+          {details?.(item, (patch) => onChange(items.map((other, j) => (j === i ? { ...other, ...patch } : other))), i)}
+        </fieldset>
+      ))}
+      <div className="theta-inline">
+        <button className="theta-button" disabled={items.length >= max} onClick={() => onChange([...items, make()])}>
+          + {noun}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PricesSettings({ block, onChange }: Props<PricesBlock>) {
+  return (
+    <ListSettings items={block.items} onChange={(items) => onChange({ items })} make={emptyPriceItem} max={MAX_LIST_ITEMS} noun="Eintrag" name={(item) => item.name} />
+  );
+}
+
+function FaqSettings({ block, onChange }: Props<FaqBlock>) {
+  return (
+    <ListSettings items={block.items} onChange={(items) => onChange({ items })} make={emptyFaqItem} max={MAX_LIST_ITEMS} noun="Frage" name={(item) => item.question} />
+  );
+}
+
+function HoursSettings({ block, onChange }: Props<HoursBlock>) {
+  return <ListSettings items={block.rows} onChange={(rows) => onChange({ rows })} make={emptyHoursRow} max={MAX_HOURS_ROWS} noun="Zeile" name={(row) => row.days} />;
+}
+
+function TeamSettings({ block, onChange }: Props<TeamBlock>) {
+  const photo = (member: TeamMember, update: (patch: Partial<TeamMember>) => void, i: number) => (
+    <>
+      <div className="theta-inline">
+        <MediaPicker label={member.src ? "Anderes Foto" : "Foto wählen"} onSelect={([picked]) => update({ src: picked!.url })} />
+        {member.src && (
+          <button className="theta-button" onClick={() => update({ src: "", alt: "" })}>
+            Foto entfernen
+          </button>
+        )}
+      </div>
+      {member.src && (
+        <input value={member.alt} placeholder="Bildbeschreibung" aria-label={`Person ${i + 1}: Bildbeschreibung`} onChange={(e) => update({ alt: e.target.value })} />
+      )}
+      <AltHint src={member.src} alt={member.alt} />
+    </>
+  );
+  return (
+    <ListSettings
+      items={block.members}
+      onChange={(members) => onChange({ members })}
+      make={emptyTeamMember}
+      max={MAX_TEAM}
+      noun="Person"
+      name={(member) => member.name}
+      details={photo}
+    />
   );
 }

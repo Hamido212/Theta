@@ -3,12 +3,16 @@ import type {
   Block,
   ButtonBlock,
   ColumnsBlock,
+  FaqBlock,
   GalleryBlock,
   HeadingBlock,
   HeroBlock,
+  HoursBlock,
   ImageBlock,
+  PricesBlock,
   QuoteBlock,
   SectionBlock,
+  TeamBlock,
   TextBlock,
   VideoBlock,
 } from "../blocks";
@@ -220,6 +224,132 @@ function Hero({ block, edit }: BlockProps<HeroBlock>) {
   );
 }
 
+// Replaces one entry of a list field, for blocks made of several similar entries.
+const patchAt = <T,>(list: T[], index: number, patch: Partial<T>) => list.map((item, i) => (i === index ? { ...item, ...patch } : item));
+
+function Prices({ block, edit }: BlockProps<PricesBlock>) {
+  const items = edit ? block.items : block.items.filter((item) => item.name.trim() || item.price.trim());
+  if (items.length === 0) return null;
+  const change = (index: number, patch: Partial<PricesBlock["items"][number]>) => edit?.({ items: patchAt(block.items, index, patch) });
+  return (
+    <ul className="t-prices">
+      {items.map((item, i) => (
+        <li key={i}>
+          <div className="t-price-line">
+            <span className="t-price-name">
+              <TextField value={item.name} onChange={edit && ((name) => change(i, { name }))} placeholder="Name, z. B. Cappuccino" />
+            </span>
+            <span className="t-price-dots" aria-hidden="true" />
+            <span className="t-price">
+              <TextField value={item.price} onChange={edit && ((price) => change(i, { price }))} placeholder="Preis" />
+            </span>
+          </div>
+          {(edit || item.description.trim()) && (
+            <div className="t-price-description">
+              <TextField value={item.description} onChange={edit && ((description) => change(i, { description }))} placeholder="Beschreibung (optional)" />
+            </div>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Faq({ block, edit }: BlockProps<FaqBlock>) {
+  const change = (index: number, patch: Partial<FaqBlock["items"][number]>) => edit?.({ items: patchAt(block.items, index, patch) });
+  if (edit) {
+    // Everything stays open while editing, so each answer can be written in place.
+    return (
+      <div className="t-faq">
+        {block.items.map((item, i) => (
+          <div key={i} className="t-faq-item">
+            <div className="t-faq-question">
+              <TextField value={item.question} onChange={(question) => change(i, { question })} placeholder="Frage" />
+            </div>
+            <div className="t-text t-faq-answer">
+              <TextField value={item.answer} onChange={(answer) => change(i, { answer })} rich placeholder="Antwort" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  const items = block.items.filter((item) => item.question.trim() && item.answer.trim());
+  if (items.length === 0) return null;
+  // details/summary opens and closes without any script.
+  return (
+    <div className="t-faq">
+      {items.map((item, i) => (
+        <details key={i} className="t-faq-item">
+          <summary className="t-faq-question">{item.question}</summary>
+          <div className="t-text t-faq-answer">
+            <TextField value={item.answer} rich />
+          </div>
+        </details>
+      ))}
+    </div>
+  );
+}
+
+function Hours({ block, edit }: BlockProps<HoursBlock>) {
+  const rows = edit ? block.rows : block.rows.filter((row) => row.days.trim() && row.time.trim());
+  if (rows.length === 0 && !block.note.trim()) return null;
+  const change = (index: number, patch: Partial<HoursBlock["rows"][number]>) => edit?.({ rows: patchAt(block.rows, index, patch) });
+  return (
+    <div className="t-hours">
+      <dl>
+        {rows.map((row, i) => (
+          <div key={i} className="t-hours-row">
+            <dt>
+              <TextField value={row.days} onChange={edit && ((days) => change(i, { days }))} placeholder="Tage, z. B. Montag bis Freitag" />
+            </dt>
+            <dd>
+              <TextField value={row.time} onChange={edit && ((time) => change(i, { time }))} placeholder="Zeit, z. B. 8 bis 18 Uhr" />
+            </dd>
+          </div>
+        ))}
+      </dl>
+      {(edit || block.note.trim()) && (
+        <p className="t-hours-note">
+          <TextField value={block.note} onChange={edit && ((note) => edit({ note }))} placeholder="Hinweis (optional), z. B. an Feiertagen geschlossen" />
+        </p>
+      )}
+    </div>
+  );
+}
+
+function Team({ block, edit }: BlockProps<TeamBlock>) {
+  const members = edit ? block.members : block.members.filter((member) => member.name.trim());
+  if (members.length === 0) return null;
+  const change = (index: number, patch: Partial<TeamBlock["members"][number]>) => edit?.({ members: patchAt(block.members, index, patch) });
+  return (
+    <ul className="t-team">
+      {members.map((member, i) => (
+        <li key={i} className="t-member">
+          {member.src ? (
+            <Img src={member.src} alt={member.alt} sizes="10rem" />
+          ) : (
+            edit && <span className="t-member-photo-empty" aria-hidden="true" />
+          )}
+          <h3 className="t-member-name">
+            <TextField value={member.name} onChange={edit && ((name) => change(i, { name }))} placeholder="Name" />
+          </h3>
+          {(edit || member.role.trim()) && (
+            <p className="t-member-role">
+              <TextField value={member.role} onChange={edit && ((role) => change(i, { role }))} placeholder="Aufgabe, z. B. Inhaberin" />
+            </p>
+          )}
+          {(edit || member.text.trim()) && (
+            <div className="t-member-text">
+              <TextField value={member.text} onChange={edit && ((text) => change(i, { text }))} multiline placeholder="Ein paar Worte (optional)" />
+            </div>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 // In the editor a section shows where a new band starts; on the site it is the band itself.
 function Section({ block, edit }: BlockProps<SectionBlock>) {
   return edit ? <div className="t-section-marker">Neuer Abschnitt · {sectionBackgrounds[block.background]}</div> : null;
@@ -299,5 +429,13 @@ export function BlockView({ block, edit }: BlockProps<Block>) {
       return <Section block={block} edit={e} />;
     case "hero":
       return <Hero block={block} edit={e} />;
+    case "prices":
+      return <Prices block={block} edit={e} />;
+    case "faq":
+      return <Faq block={block} edit={e} />;
+    case "hours":
+      return <Hours block={block} edit={e} />;
+    case "team":
+      return <Team block={block} edit={e} />;
   }
 }

@@ -26,6 +26,18 @@ export type SectionBlock = { id: string; type: "section"; background: SectionBac
 // A large picture across the whole window with the page title, a sentence and up to two buttons on top.
 export type HeroButton = { label: string; href: string };
 export type HeroBlock = { id: string; type: "hero"; title: string; text: string; src: string; alt: string; buttons: HeroButton[] };
+// A menu or price list: name and price on one line, an optional description below.
+export type PriceItem = { name: string; description: string; price: string };
+export type PricesBlock = { id: string; type: "prices"; items: PriceItem[] };
+// Frequently asked questions; each answer opens when its question is clicked.
+export type FaqItem = { question: string; answer: string };
+export type FaqBlock = { id: string; type: "faq"; items: FaqItem[] };
+// Opening hours as a small table, e.g. "Montag bis Freitag" – "8 bis 18 Uhr", plus a note.
+export type HoursRow = { days: string; time: string };
+export type HoursBlock = { id: string; type: "hours"; rows: HoursRow[]; note: string };
+// People with a photo, name, role and a few words.
+export type TeamMember = { name: string; role: string; text: string; src: string; alt: string };
+export type TeamBlock = { id: string; type: "team"; members: TeamMember[] };
 
 export type Block =
   | HeadingBlock
@@ -38,7 +50,11 @@ export type Block =
   | QuoteBlock
   | DividerBlock
   | SectionBlock
-  | HeroBlock;
+  | HeroBlock
+  | PricesBlock
+  | FaqBlock
+  | HoursBlock
+  | TeamBlock;
 export type BlockType = Block["type"];
 
 export type PageKind = "page" | "post";
@@ -115,6 +131,10 @@ export const blockLabels: Record<BlockType, string> = {
   divider: "Trenner",
   section: "Abschnitt",
   hero: "Titelbild",
+  prices: "Preisliste",
+  faq: "Fragen & Antworten",
+  hours: "Öffnungszeiten",
+  team: "Team",
 };
 
 export const sectionBackgrounds: Record<SectionBackground, string> = {
@@ -127,6 +147,9 @@ export const sectionBackgrounds: Record<SectionBackground, string> = {
 export const MAX_HERO_BUTTONS = 2;
 
 export const MAX_COLUMNS = 4;
+export const MAX_LIST_ITEMS = 100;
+export const MAX_HOURS_ROWS = 14;
+export const MAX_TEAM = 24;
 export const MAX_GALLERY_IMAGES = 60;
 
 export function newBlock(type: BlockType, id: string = crypto.randomUUID()): Block {
@@ -153,8 +176,30 @@ export function newBlock(type: BlockType, id: string = crypto.randomUUID()): Blo
       return { id, type, background: "soft" };
     case "hero":
       return { id, type, title: "", text: "", src: "", alt: "", buttons: [emptyHeroButton()] };
+    case "prices":
+      return { id, type, items: [emptyPriceItem(), emptyPriceItem(), emptyPriceItem()] };
+    case "faq":
+      return { id, type, items: [emptyFaqItem(), emptyFaqItem()] };
+    case "hours":
+      return {
+        id,
+        type,
+        rows: [
+          { days: "Montag bis Freitag", time: "" },
+          { days: "Samstag", time: "" },
+          { days: "Sonntag", time: "geschlossen" },
+        ],
+        note: "",
+      };
+    case "team":
+      return { id, type, members: [emptyTeamMember(), emptyTeamMember(), emptyTeamMember()] };
   }
 }
+
+export const emptyPriceItem = (): PriceItem => ({ name: "", description: "", price: "" });
+export const emptyFaqItem = (): FaqItem => ({ question: "", answer: "" });
+export const emptyHoursRow = (): HoursRow => ({ days: "", time: "" });
+export const emptyTeamMember = (): TeamMember => ({ name: "", role: "", text: "", src: "", alt: "" });
 
 export const emptyHeroButton = (): HeroButton => ({ label: "", href: "" });
 
@@ -174,8 +219,10 @@ export class ValidationError extends Error {
 // ("Block 3 (Galerie), Bild 2: Die Bild-Adresse").
 const FIELD_NAMES: [RegExp, string][] = [
   [/\.images\[(\d+)\]/g, ", Bild $1"],
-  [/\.items\[(\d+)\]/g, ", Spalte $1"],
+  [/\.items\[(\d+)\]/g, ", $item $1"],
   [/\.buttons\[(\d+)\]/g, ", Button $1"],
+  [/\.rows\[(\d+)\]/g, ", Zeile $1"],
+  [/\.members\[(\d+)\]/g, ", Person $1"],
   [/\.(src)\b/g, ": Die Bild-Adresse"],
   [/\.(href)\b/g, ": Das Link-Ziel"],
   [/\.(url)\b/g, ": Die Video-Adresse"],
@@ -185,6 +232,12 @@ const FIELD_NAMES: [RegExp, string][] = [
   [/\.(text)\b/g, ": Der Text"],
   [/\.(label|linkLabel)\b/g, ": Die Beschriftung"],
   [/\.(cite)\b/g, ": Die Quelle"],
+  [/\.(name)\b/g, ": Der Name"],
+  [/\.(price)\b/g, ": Der Preis"],
+  [/\.(description)\b/g, ": Die Beschreibung"],
+  [/\.(question)\b/g, ": Die Frage"],
+  [/\.(answer)\b/g, ": Die Antwort"],
+  [/\.(role)\b/g, ": Die Aufgabe"],
   [/\.(level)\b/g, ": Die Art der Überschrift"],
 ];
 
@@ -194,7 +247,7 @@ function friendly(message: string, index: number, type: unknown): string {
   for (const [pattern, words] of FIELD_NAMES) {
     text = text.replace(pattern, (_, n: string) => (words.includes("$1") ? words.replace("$1", String(Number(n) + 1)) : words));
   }
-  return text;
+  return text.replace("$item", type === "columns" ? "Spalte" : "Eintrag");
 }
 
 const MAX_BLOCKS = 500;
@@ -300,6 +353,46 @@ export function parseBlocks(input: unknown): Block[] {
         });
         return { id, type: "hero", title: string(value.title, `${where}.title`, 500), text: string(value.text, `${where}.text`, 2_000), ...image(value, where), buttons };
       }
+      case "prices":
+        return {
+          id,
+          type: "prices",
+          items: records(value.items, `${where}.items`, MAX_LIST_ITEMS, (item, at) => ({
+            name: string(item.name, `${at}.name`, 500),
+            description: string(item.description, `${at}.description`, 2_000),
+            price: string(item.price, `${at}.price`, 100),
+          })),
+        };
+      case "faq":
+        return {
+          id,
+          type: "faq",
+          items: records(value.items, `${where}.items`, MAX_LIST_ITEMS, (item, at) => ({
+            question: string(item.question, `${at}.question`, 500),
+            answer: string(item.answer, `${at}.answer`),
+          })),
+        };
+      case "hours":
+        return {
+          id,
+          type: "hours",
+          rows: records(value.rows, `${where}.rows`, MAX_HOURS_ROWS, (row, at) => ({
+            days: string(row.days, `${at}.days`, 200),
+            time: string(row.time, `${at}.time`, 200),
+          })),
+          note: string(value.note, `${where}.note`, 2_000),
+        };
+      case "team":
+        return {
+          id,
+          type: "team",
+          members: records(value.members, `${where}.members`, MAX_TEAM, (member, at) => ({
+            name: string(member.name, `${at}.name`, 200),
+            role: string(member.role, `${at}.role`, 200),
+            text: string(member.text, `${at}.text`, 2_000),
+            ...image(member, at),
+          })),
+        };
       default:
         throw new ValidationError(`${where}: unbekannter Typ ${JSON.stringify(value.type)}`);
     }
@@ -338,6 +431,11 @@ function headingLevel(value: unknown, field: string): HeadingLevel {
 function object(value: unknown, field: string): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) throw new ValidationError(`${field}: kein Objekt`);
   return value as Record<string, unknown>;
+}
+
+// A list of objects, each checked by parse with its own position for error messages.
+function records<T>(value: unknown, field: string, max: number, parse: (item: Record<string, unknown>, at: string) => T): T[] {
+  return list(value, field, max).map((item, i) => parse(object(item, `${field}[${i}]`), `${field}[${i}]`));
 }
 
 function list(value: unknown, field: string, max: number): unknown[] {
