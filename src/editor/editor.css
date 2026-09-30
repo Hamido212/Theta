@@ -227,3 +227,76 @@
   display: inline-block;
   min-width: 10ch;
 }
+
+.theta-dialog {
+  width: min(56rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 4rem);
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, var(--t-color-muted) 30%, transparent);
+  border-radius: 16px;
+  background: var(--t-color-bg);
+  color: var(--t-color-text);
+  font: 0.9rem/1.4 var(--t-font-body);
+}
+
+.theta-dialog::backdrop {
+  background: rgb(0 0 0 / 0.45);
+}
+
+.theta-dialog header,
+.theta-dialog footer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.theta-dialog header strong {
+  margin-right: auto;
+}
+
+.theta-dialog footer {
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+.theta-busy {
+  opacity: 0.6;
+}
+
+.theta-media {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+  gap: 0.5rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.theta-media button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 3px solid transparent;
+  border-radius: 10px;
+  background: none;
+  cursor: pointer;
+}
+
+.theta-media button:hover,
+.theta-media .theta-selected {
+  border-color: var(--t-color-accent);
+}
+
+.theta-media img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 7px;
+}
+
+.theta-dialog label.theta-button {
+  display: inline-block;
+  color: var(--t-color-bg);
+  cursor: pointer;
+}

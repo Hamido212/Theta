@@ -11,6 +11,7 @@ import type {
   VideoBlock,
 } from "../blocks";
 import { TextField } from "./fields";
+import { Img } from "./image";
 import { videoPlaceholder, videoSource } from "./video";
 
 // The default theme. Every block component renders on the server (edit is undefined)
@@ -50,7 +51,7 @@ function Image({ block, edit }: BlockProps<ImageBlock>) {
   if (!block.src) return edit ? <Empty>Noch kein Bild ausgewählt</Empty> : null;
   return (
     <figure className="t-image">
-      <img src={block.src} alt={block.alt} loading="lazy" decoding="async" />
+      <Img src={block.src} alt={block.alt} sizes="(min-width: 44rem) 42rem, 100vw" />
     </figure>
   );
 }
@@ -62,7 +63,7 @@ function Gallery({ block, edit }: BlockProps<GalleryBlock>) {
     <ul className="t-gallery">
       {images.map((image, i) => (
         <li key={i}>
-          <img src={image.src} alt={image.alt} loading="lazy" decoding="async" />
+          <Img src={image.src} alt={image.alt} sizes="(min-width: 44rem) 14rem, 45vw" />
         </li>
       ))}
     </ul>

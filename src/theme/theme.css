@@ -147,6 +147,7 @@ body {
 .t-gallery img {
   display: block;
   width: 100%;
+  height: auto;
   aspect-ratio: 1;
   object-fit: cover;
   border-radius: calc(var(--t-radius) / 1.5);
