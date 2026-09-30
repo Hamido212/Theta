@@ -30,6 +30,16 @@ const migrations: string[] = [
      key   TEXT PRIMARY KEY,
      value TEXT NOT NULL
    )`,
+  `CREATE TABLE media (
+     id         TEXT PRIMARY KEY,
+     filename   TEXT NOT NULL,
+     file       TEXT NOT NULL,
+     width      INTEGER NOT NULL,
+     height     INTEGER NOT NULL,
+     size       INTEGER NOT NULL,
+     variants   TEXT NOT NULL,
+     created_at TEXT NOT NULL
+   )`,
 ];
 
 export function openDatabase(path: string): Database {

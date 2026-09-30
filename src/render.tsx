@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { HOME, type NavItem, type Page, type SiteSettings, publicPath } from "./blocks";
 import { BlockView } from "./theme/blocks";
+import { type ImageLookup, ImageLookupContext } from "./theme/image";
 import { SiteFrame } from "./theme/layout";
 
 // What every page needs to know about the site around it.
@@ -10,6 +11,8 @@ export type SiteContext = {
   nav: NavItem[];
   // Absolute base address, e.g. https://example.com, for canonical links and the sitemap.
   origin: string;
+  // Size and smaller copies of uploaded images.
+  images?: ImageLookup;
 };
 
 // Data the browser editor starts with.
@@ -65,14 +68,16 @@ function SeoTags({ page, site, origin }: { page: Page; site: SiteSettings; origi
 }
 
 // Public page: plain HTML and CSS, no JavaScript at all.
-export function renderPage(page: Page, { site, nav, origin }: SiteContext): string {
+export function renderPage(page: Page, { site, nav, origin, images = () => null }: SiteContext): string {
   return html(
     <Document title={pageTitle(page, site)} head={<SeoTags page={page} site={site} origin={origin} />}>
-      <SiteFrame site={site} nav={nav} current={page.slug} linkTo={publicPath}>
-        {page.blocks.map((block) => (
-          <BlockView key={block.id} block={block} />
-        ))}
-      </SiteFrame>
+      <ImageLookupContext.Provider value={images}>
+        <SiteFrame site={site} nav={nav} current={page.slug} linkTo={publicPath}>
+          {page.blocks.map((block) => (
+            <BlockView key={block.id} block={block} />
+          ))}
+        </SiteFrame>
+      </ImageLookupContext.Provider>
     </Document>,
   );
 }

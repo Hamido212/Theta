@@ -48,6 +48,9 @@ export type SiteSettings = {
 
 export type NavItem = { slug: string; title: string };
 
+// Size and responsive sources of an uploaded image, used for srcset and to avoid layout jumps.
+export type ImageInfo = { width: number; height: number; srcset: string };
+
 export const blockLabels: Record<BlockType, string> = {
   heading: "Überschrift",
   text: "Text",

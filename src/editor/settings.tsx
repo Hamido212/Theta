@@ -11,6 +11,7 @@ import {
   publicPath,
 } from "../blocks";
 import { videoSource } from "../theme/video";
+import { MediaPicker } from "./media-picker";
 
 // Settings shown below a block for everything that is not edited directly on the page.
 
@@ -43,6 +44,9 @@ function AltHint({ src, alt }: { src: string; alt: string }) {
 function ImageSettings({ block, onChange }: Props<ImageBlock>) {
   return (
     <div className="theta-settings">
+      <div>
+        <MediaPicker label={block.src ? "Anderes Bild wählen" : "Bild wählen oder hochladen"} onSelect={([item]) => onChange({ src: item!.url })} />
+      </div>
       <label>
         Bild-Adresse
         <input type="url" value={block.src} placeholder="https://… oder /media/…" onChange={(e) => onChange({ src: e.target.value })} />
@@ -72,9 +76,14 @@ function GallerySettings({ block, onChange }: Props<GalleryBlock>) {
           <AltHint src={image.src} alt={image.alt} />
         </fieldset>
       ))}
-      <div>
+      <div className="theta-inline">
+        <MediaPicker
+          multiple
+          label="Bilder aus der Mediathek hinzufügen"
+          onSelect={(items) => onChange({ images: [...block.images, ...items.map((item) => ({ src: item.url, alt: "" }))] })}
+        />
         <button className="theta-button" onClick={() => onChange({ images: [...block.images, { src: "", alt: "" }] })}>
-          + Bild hinzufügen
+          + Bild per Adresse
         </button>
       </div>
     </div>

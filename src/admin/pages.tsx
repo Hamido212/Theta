@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { User } from "../auth";
 import { HOME, type Page, type SiteSettings, editPath, publicPath } from "../blocks";
+import type { MediaItem } from "../media";
 
 // Server-rendered admin screens. They work without JavaScript: plain forms that post back.
 
@@ -103,6 +104,29 @@ export function renderSetupLocked() {
   );
 }
 
+function AdminBar({ user, current }: { user: User; current: "pages" | "media" }) {
+  return (
+    <header className="a-bar">
+      <strong>θ Theta</strong>
+      <nav className="a-tabs" aria-label="Verwaltung">
+        <a href="/admin" aria-current={current === "pages" ? "page" : undefined}>
+          Seiten
+        </a>
+        <a href="/admin/media" aria-current={current === "media" ? "page" : undefined}>
+          Mediathek
+        </a>
+      </nav>
+      <a href="/" target="_blank" rel="noopener">
+        Website ansehen
+      </a>
+      <span className="a-muted">{user.name}</span>
+      <form method="post" action="/logout">
+        <button className="a-link">Abmelden</button>
+      </form>
+    </header>
+  );
+}
+
 type DashboardProps = { user: User; pages: Page[]; site: SiteSettings; error?: string };
 
 export function renderDashboard({ user, pages, site, error }: DashboardProps) {
@@ -111,16 +135,7 @@ export function renderDashboard({ user, pages, site, error }: DashboardProps) {
     <html lang="de">
       <AdminHead title="Übersicht" />
       <body>
-        <header className="a-bar">
-          <strong>θ Theta</strong>
-          <a href="/" target="_blank" rel="noopener">
-            Website ansehen
-          </a>
-          <span className="a-muted">{user.name}</span>
-          <form method="post" action="/logout">
-            <button className="a-link">Abmelden</button>
-          </form>
-        </header>
+        <AdminBar user={user} current="pages" />
 
         <main className="a-main">
           <ErrorMessage error={error} />
@@ -190,6 +205,72 @@ export function renderDashboard({ user, pages, site, error }: DashboardProps) {
               </label>
               <button className="a-primary">Speichern</button>
             </form>
+          </section>
+        </main>
+      </body>
+    </html>,
+  );
+}
+
+type MediaLibraryProps = { user: User; items: MediaItem[]; usage: Map<string, string[]>; error?: string };
+
+const formatSize = (bytes: number) =>
+  bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1).replace(".", ",")} MB`;
+
+export function renderMediaLibrary({ user, items, usage, error }: MediaLibraryProps) {
+  return html(
+    <html lang="de">
+      <AdminHead title="Mediathek" />
+      <body>
+        <AdminBar user={user} current="media" />
+        <main className="a-main">
+          <ErrorMessage error={error} />
+          <section className="a-section">
+            <h2>Bilder hochladen</h2>
+            <form method="post" action="/admin/media" encType="multipart/form-data" className="a-inline">
+              <input type="file" name="file" accept="image/jpeg,image/png,image/webp,image/avif,image/gif" multiple required />
+              <button className="a-primary">Hochladen</button>
+            </form>
+            <p className="a-muted">
+              JPG, PNG, WebP, AVIF oder GIF bis 20 MB. Theta dreht Fotos richtig herum, entfernt Standortdaten und erzeugt
+              kleinere Versionen für schnelle Ladezeiten.
+            </p>
+          </section>
+
+          <section className="a-section">
+            <h2>Mediathek</h2>
+            {items.length === 0 ? (
+              <p className="a-muted">Noch keine Bilder hochgeladen.</p>
+            ) : (
+              <ul className="a-media">
+                {items.map((item) => {
+                  const usedOn = usage.get(item.id) ?? [];
+                  return (
+                    <li key={item.id}>
+                      <a href={item.url} target="_blank" rel="noopener">
+                        <img src={item.thumb} alt="" loading="lazy" />
+                      </a>
+                      <span className="a-title" title={item.filename}>
+                        {item.filename}
+                      </span>
+                      <span className="a-muted">
+                        {item.width} × {item.height} · {formatSize(item.size)}
+                      </span>
+                      <input className="a-copy" readOnly value={item.url} aria-label={`Adresse von ${item.filename}`} />
+                      {usedOn.length > 0 && <span className="a-muted">Verwendet auf: {usedOn.join(", ")}</span>}
+                      <details className="a-delete">
+                        <summary>Löschen</summary>
+                        <form method="post" action={`/admin/media/${item.id}/delete`}>
+                          <button className="a-danger">
+                            {usedOn.length > 0 ? "Trotzdem löschen, das Bild verschwindet von den Seiten" : "Endgültig löschen"}
+                          </button>
+                        </form>
+                      </details>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </section>
         </main>
       </body>

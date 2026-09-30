@@ -23,8 +23,9 @@ Passwort vergessen? `bun run theta reset-password deine@adresse.de` setzt ein ne
 
 - **Direkt auf der Seite bearbeiten.** Der Editor zeigt die Seite genau so, wie Besucher sie sehen. Texte ändert man an Ort und Stelle, Blöcke lassen sich hinzufügen, verschieben und löschen.
 - **Leitplanken statt Stil-Chaos.** Blöcke speichern nur Inhalt. Farben, Schriften und Abstände kommen aus den Design-Tokens des Themes (`src/theme/theme.css`), deshalb bleibt die Seite immer stimmig.
-- **Die Website ist eine Datei.** Alle Inhalte liegen in einer einzigen SQLite-Datei (`theta.db`). Kopieren heißt umziehen.
+- **Die Website ist ein Ordner.** Alle Inhalte liegen in einer SQLite-Datei (`theta.db`), hochgeladene Bilder im Ordner `uploads/` daneben. Kopieren heißt umziehen.
 - **Schnell ab Werk.** Die öffentliche Seite ist reines HTML und CSS, ganz ohne JavaScript.
+- **Bilder ohne Vorarbeit.** Hochgeladene Fotos dreht Theta richtig herum, entfernt Metadaten wie den Aufnahmeort, verkleinert sie auf höchstens 2560 Pixel und erzeugt kleinere WebP-Versionen. Besucher bekommen automatisch die passende Größe.
 - **Barrierefreiheit im Blick.** Fehlt einem Bild die Beschreibung, weist der Editor darauf hin.
 
 - **Gefunden werden.** Jede Seite hat Titel und Beschreibung für Suchmaschinen, eine kanonische Adresse und Vorschau-Daten für geteilte Links. `sitemap.xml` und `robots.txt` erzeugt Theta automatisch.
@@ -39,6 +40,7 @@ Blöcke: Überschrift, Text, Bild, Galerie, Button, Spalten, Video, Zitat und Tr
 | `src/db.ts` | SQLite-Datenbank und Schema-Migrationen |
 | `src/store.ts` | Speicherung der Seiten |
 | `src/auth.ts` | Konten, Passwörter und Anmeldungen |
+| `src/media.ts` | Hochgeladene Bilder: Prüfung, Optimierung, kleinere Versionen |
 | `src/admin/` | Übersicht, Anmelde- und Einrichtungsseiten |
 | `src/theme/` | Das Standard-Theme: Kopfzeile mit Menü, Block-Komponenten und Design-Tokens |
 | `src/render.tsx` | Rendert die öffentliche Seite und die Editor-Seite auf dem Server |
@@ -54,11 +56,12 @@ Theme-Komponenten laufen an beiden Stellen: auf dem Server für die öffentliche
 | `PORT` | `3000` | Port des Servers |
 | `THETA_HOST` | `127.0.0.1` | Adresse, auf der der Server lauscht |
 | `THETA_DB` | `theta.db` | Pfad zur SQLite-Datei |
+| `THETA_UPLOADS` | `uploads` neben der Datenbank | Ordner für hochgeladene Bilder |
 | `THETA_URL` | | Öffentliche Adresse, z. B. `https://meine-seite.de`, wenn Theta hinter einem Proxy läuft |
 
 ## Noch nicht enthalten
 
-Bilder hochladen, Änderungsverlauf, statischer Export und Plugins kommen noch. Der Server lauscht standardmäßig nur auf dem eigenen Rechner. Für den Betrieb im Internet setzt du `THETA_HOST=0.0.0.0` und stellst einen Proxy mit HTTPS davor.
+Änderungsverlauf, statischer Export und Plugins kommen noch. Der Server lauscht standardmäßig nur auf dem eigenen Rechner. Für den Betrieb im Internet setzt du `THETA_HOST=0.0.0.0` und stellst einen Proxy mit HTTPS davor.
 
 ## Entwicklung
 
