@@ -23,6 +23,13 @@ const migrations: string[] = [
      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
      expires_at TEXT NOT NULL
    )`,
+  `ALTER TABLE pages ADD COLUMN description TEXT NOT NULL DEFAULT '';
+   ALTER TABLE pages ADD COLUMN in_nav INTEGER NOT NULL DEFAULT 1;
+   ALTER TABLE pages ADD COLUMN position INTEGER NOT NULL DEFAULT 0;
+   CREATE TABLE settings (
+     key   TEXT PRIMARY KEY,
+     value TEXT NOT NULL
+   )`,
 ];
 
 export function openDatabase(path: string): Database {

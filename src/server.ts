@@ -3,14 +3,13 @@ import { timingSafeEqual } from "node:crypto";
 import { type Context, Hono, type MiddlewareHandler } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { csrf } from "hono/csrf";
-import { renderLogin, renderSetup, renderSetupLocked } from "./admin/pages";
+import { renderDashboard, renderLogin, renderSetup, renderSetupLocked } from "./admin/pages";
 import { AuthError, AuthStore, type User } from "./auth";
-import { ValidationError, parseBlocks } from "./blocks";
+import { HOME, ValidationError, editPath, parseBlocks } from "./blocks";
 import { openDatabase } from "./db";
-import { renderEditor, renderPage } from "./render";
-import { PageStore } from "./store";
+import { type SiteContext, renderEditor, renderNotFound, renderPage, renderRobots, renderSitemap } from "./render";
+import { PageStore, SettingsStore, parseDescription, parseTitle } from "./store";
 
-const HOME = "home";
 const SESSION_COOKIE = "theta_session";
 
 // Bundles the browser editor once, on first request.
@@ -36,6 +35,7 @@ const css = { "content-type": "text/css; charset=utf-8" };
 
 export type AppOptions = {
   pages: PageStore;
+  settings: SettingsStore;
   auth: AuthStore;
   // Secret for the one-time setup link. Only set while no account exists.
   setupToken?: string;
@@ -45,8 +45,14 @@ export type AppOptions = {
 
 type Env = { Variables: { user: User } };
 
-export function createApp({ pages, auth, setupToken, publicUrl }: AppOptions) {
+export function createApp({ pages, settings, auth, setupToken, publicUrl }: AppOptions) {
   const app = new Hono<Env>();
+
+  const siteContext = (c: Context<Env>): SiteContext => ({
+    site: settings.site(),
+    nav: pages.nav(),
+    origin: publicUrl ? new URL(publicUrl).origin : new URL(c.req.url).origin,
+  });
 
   // Rejects form posts from other sites, so nobody can act in the name of a logged-in user.
   app.use(csrf(publicUrl ? { origin: new URL(publicUrl).origin } : undefined));
@@ -83,7 +89,10 @@ export function createApp({ pages, auth, setupToken, publicUrl }: AppOptions) {
 
   // Public site
 
-  app.get("/", (c) => c.html(renderPage(pages.get(HOME)!)));
+  app.get("/", (c) => c.html(renderPage(pages.get(HOME)!, siteContext(c))));
+  app.get("/sitemap.xml", (c) => c.body(renderSitemap(pages.list(), siteContext(c).origin), 200, { "content-type": "application/xml; charset=utf-8" }));
+  app.get("/robots.txt", (c) => c.text(renderRobots(siteContext(c).origin)));
+  app.get(`/${HOME}`, (c) => c.redirect("/", 301));
 
   // Accounts
 
@@ -143,9 +152,61 @@ export function createApp({ pages, auth, setupToken, publicUrl }: AppOptions) {
   // Editing (login required)
 
   app.use("/edit", requireUser);
+  app.use("/edit/*", requireUser);
+  app.use("/admin", requireUser);
+  app.use("/admin/*", requireUser);
   app.use("/api/*", requireUser);
 
-  app.get("/edit", (c) => c.html(renderEditor(pages.get(HOME)!)));
+  const editor = (c: Context<Env>, slug: string) => {
+    const page = pages.get(slug);
+    if (!page) return c.html(renderNotFound(siteContext(c)), 404);
+    return c.html(renderEditor({ page, site: settings.site(), nav: pages.nav() }));
+  };
+  app.get("/edit", (c) => editor(c, HOME));
+  app.get(`/edit/${HOME}`, (c) => c.redirect("/edit"));
+  app.get("/edit/:slug", (c) => editor(c, c.req.param("slug")));
+
+  const dashboard = (c: Context<Env>, error?: string) =>
+    c.html(renderDashboard({ user: c.get("user"), pages: pages.list(), site: settings.site(), error }), error ? 400 : 200);
+
+  app.get("/admin", (c) => dashboard(c));
+
+  app.post("/admin/pages", async (c) => {
+    const form = await c.req.parseBody();
+    try {
+      return c.redirect(editPath(pages.create(String(form.title ?? "")).slug));
+    } catch (err) {
+      if (err instanceof ValidationError) return dashboard(c, err.message);
+      throw err;
+    }
+  });
+
+  app.post("/admin/pages/:slug/move", async (c) => {
+    const form = await c.req.parseBody();
+    pages.move(c.req.param("slug"), form.direction === "up" ? -1 : 1);
+    return c.redirect("/admin");
+  });
+
+  app.post("/admin/pages/:slug/delete", (c) => {
+    try {
+      pages.delete(c.req.param("slug"));
+      return c.redirect("/admin");
+    } catch (err) {
+      if (err instanceof ValidationError) return dashboard(c, err.message);
+      throw err;
+    }
+  });
+
+  app.post("/admin/site", async (c) => {
+    const form = await c.req.parseBody();
+    try {
+      settings.saveSite({ name: form.name, description: form.description ?? "" });
+      return c.redirect("/admin");
+    } catch (err) {
+      if (err instanceof ValidationError) return dashboard(c, err.message);
+      throw err;
+    }
+  });
 
   app.get("/api/pages/:slug", (c) => {
     const page = pages.get(c.req.param("slug"));
@@ -156,11 +217,17 @@ export function createApp({ pages, auth, setupToken, publicUrl }: AppOptions) {
     const page = pages.get(c.req.param("slug"));
     if (!page) return c.json({ error: "Seite nicht gefunden" }, 404);
 
-    const body = (await c.req.json().catch(() => null)) as { title?: unknown; blocks?: unknown } | null;
+    const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
     if (!body) return c.json({ error: "Ungültiges JSON" }, 400);
     try {
-      const title = body.title === undefined ? page.title : parseTitle(body.title);
-      return c.json(pages.save(page.slug, { title, blocks: parseBlocks(body.blocks) }));
+      return c.json(
+        pages.save(page.slug, {
+          title: body.title === undefined ? undefined : parseTitle(body.title),
+          description: body.description === undefined ? undefined : parseDescription(body.description),
+          inNav: body.inNav === undefined ? undefined : body.inNav === true,
+          blocks: parseBlocks(body.blocks),
+        }),
+      );
     } catch (err) {
       if (err instanceof ValidationError) return c.json({ error: err.message }, 400);
       throw err;
@@ -182,21 +249,22 @@ export function createApp({ pages, auth, setupToken, publicUrl }: AppOptions) {
     return new Response(file);
   });
 
-  return app;
-}
+  // Every other page of the site. Registered last so it cannot shadow the routes above.
+  app.get("/:slug{[a-z0-9-]+}", (c) => {
+    const page = pages.get(c.req.param("slug"));
+    return page ? c.html(renderPage(page, siteContext(c))) : c.html(renderNotFound(siteContext(c)), 404);
+  });
 
-function parseTitle(value: unknown): string {
-  if (typeof value !== "string" || value.trim() === "" || value.length > 200) {
-    throw new ValidationError("title muss Text mit 1 bis 200 Zeichen sein");
-  }
-  return value.trim();
+  app.notFound((c) => c.html(renderNotFound(siteContext(c)), 404));
+
+  return app;
 }
 
 // Only allow redirects to paths on this site.
 function safeNext(value: unknown): string {
   return typeof value === "string" && value.startsWith("/") && !value.startsWith("//") && !value.includes("\\")
     ? value
-    : "/edit";
+    : "/admin";
 }
 
 function safeEqual(a: string, b: string): boolean {
@@ -214,7 +282,7 @@ if (import.meta.main) {
   const server = Bun.serve({
     hostname: process.env.THETA_HOST ?? "127.0.0.1",
     port: Number(process.env.PORT ?? 3000),
-    fetch: createApp({ pages: new PageStore(db), auth, setupToken, publicUrl }).fetch,
+    fetch: createApp({ pages: new PageStore(db), settings: new SettingsStore(db), auth, setupToken, publicUrl }).fetch,
   });
 
   const base = publicUrl ?? server.url;
@@ -222,6 +290,6 @@ if (import.meta.main) {
   if (setupToken) {
     console.log(`\nNoch kein Konto vorhanden. Richte Theta hier ein:\n${new URL(`/setup?token=${setupToken}`, base)}\n`);
   } else {
-    console.log(`Bearbeiten: ${new URL("/edit", base)}`);
+    console.log(`Verwalten: ${new URL("/admin", base)}`);
   }
 }
