@@ -275,7 +275,8 @@ body {
 
 .t-gallery {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  grid-template-columns: repeat(var(--t-gallery-columns, 3), minmax(0, 1fr));
+  align-items: start;
   gap: calc(var(--t-space) / 2);
   margin: 0;
   padding: 0;
@@ -286,9 +287,18 @@ body {
   display: block;
   width: 100%;
   height: auto;
+  border-radius: calc(var(--t-radius) / 1.5);
+}
+
+.t-gallery-crop img {
   aspect-ratio: 1;
   object-fit: cover;
-  border-radius: calc(var(--t-radius) / 1.5);
+}
+
+@media (max-width: 40rem) {
+  .t-gallery {
+    grid-template-columns: repeat(min(var(--t-gallery-columns, 3), 2), minmax(0, 1fr));
+  }
 }
 
 .t-buttons {
@@ -336,6 +346,48 @@ a.t-button:hover {
   .t-columns {
     grid-template-columns: 1fr;
   }
+}
+
+/* Cards: each column on its own softly tinted surface, picture on top. */
+.t-columns-cards {
+  gap: calc(var(--t-space) * 0.75);
+}
+
+.t-columns-cards .t-column {
+  --t-card-pad: min(var(--t-space), 1.25rem);
+  display: flex;
+  flex-direction: column;
+  padding: var(--t-card-pad);
+  border-radius: var(--t-radius);
+  background: color-mix(in srgb, var(--t-color-text) 5%, var(--t-color-bg));
+  overflow: hidden;
+}
+
+.t-columns-cards .t-column > img {
+  display: block;
+  width: calc(100% + 2 * var(--t-card-pad));
+  max-width: none;
+  height: auto;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  margin: calc(var(--t-card-pad) * -1) calc(var(--t-card-pad) * -1) var(--t-card-pad);
+}
+
+.t-column-link {
+  display: inline-block;
+  margin-top: auto;
+  padding-top: 0.75rem;
+  color: var(--t-color-accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.t-column-link::after {
+  content: "\00a0→";
+}
+
+a.t-column-link:hover {
+  text-decoration: underline;
 }
 
 .t-column-title {

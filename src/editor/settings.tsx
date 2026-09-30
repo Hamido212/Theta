@@ -1,6 +1,7 @@
 import {
   type Block,
   type ButtonBlock,
+  type Column,
   type ColumnsBlock,
   type GalleryBlock,
   type HeadingBlock,
@@ -134,6 +135,17 @@ function GallerySettings({ block, onChange }: Props<GalleryBlock>) {
         </fieldset>
       ))}
       <div className="theta-inline">
+        <select aria-label="Bilder pro Reihe" value={block.columns} onChange={(e) => onChange({ columns: Number(e.target.value) as GalleryBlock["columns"] })}>
+          <option value={2}>2 pro Reihe</option>
+          <option value={3}>3 pro Reihe</option>
+          <option value={4}>4 pro Reihe</option>
+        </select>
+        <select aria-label="Bildformat" value={block.crop ? "crop" : "original"} onChange={(e) => onChange({ crop: e.target.value === "crop" })}>
+          <option value="crop">Quadratisch zuschneiden</option>
+          <option value="original">Originalformat</option>
+        </select>
+      </div>
+      <div className="theta-inline">
         <MediaPicker
           multiple
           label="Bilder aus der Mediathek hinzufügen"
@@ -220,16 +232,43 @@ function ButtonSettings({ block, onChange, pages }: Props<ButtonBlock>) {
   );
 }
 
-function ColumnsSettings({ block, onChange }: Props<ColumnsBlock>) {
+function ColumnsSettings({ block, onChange, pages }: Props<ColumnsBlock>) {
+  const update = (index: number, patch: Partial<Column>) =>
+    onChange({ items: block.items.map((item, i) => (i === index ? { ...item, ...patch } : item)) });
   return (
-    <div className="theta-settings theta-inline">
-      <span>{block.items.length} Spalten</span>
-      <button className="theta-button" disabled={block.items.length >= MAX_COLUMNS} onClick={() => onChange({ items: [...block.items, emptyColumn()] })}>
-        + Spalte
-      </button>
-      <button className="theta-button" disabled={block.items.length <= 1} onClick={() => onChange({ items: block.items.slice(0, -1) })}>
-        − Letzte Spalte entfernen
-      </button>
+    <div className="theta-settings">
+      <div className="theta-inline">
+        <select aria-label="Darstellung der Spalten" value={block.style} onChange={(e) => onChange({ style: e.target.value as ColumnsBlock["style"] })}>
+          <option value="cards">Karten mit Bild</option>
+          <option value="plain">Nur Text</option>
+        </select>
+        <span>{block.items.length} Spalten</span>
+        <button className="theta-button" disabled={block.items.length >= MAX_COLUMNS} onClick={() => onChange({ items: [...block.items, emptyColumn()] })}>
+          + Spalte
+        </button>
+        <button className="theta-button" disabled={block.items.length <= 1} onClick={() => onChange({ items: block.items.slice(0, -1) })}>
+          − Letzte Spalte entfernen
+        </button>
+      </div>
+      {block.style === "cards" &&
+        block.items.map((item, i) => (
+          <fieldset key={i} className="theta-card-settings">
+            <legend>Karte {i + 1}</legend>
+            <div className="theta-inline">
+              <MediaPicker label={item.src ? "Anderes Bild" : "Bild wählen"} onSelect={([picked]) => update(i, { src: picked!.url })} />
+              {item.src && (
+                <button className="theta-button" onClick={() => update(i, { src: "", alt: "" })}>
+                  Bild entfernen
+                </button>
+              )}
+            </div>
+            {item.src && (
+              <input value={item.alt} placeholder="Bildbeschreibung" aria-label={`Karte ${i + 1}: Bildbeschreibung`} onChange={(e) => update(i, { alt: e.target.value })} />
+            )}
+            <AltHint src={item.src} alt={item.alt} />
+            <LinkTarget id={`${block.id}-${i}`} label="Link (optional)" value={item.href} pages={pages} onChange={(href) => update(i, { href })} />
+          </fieldset>
+        ))}
     </div>
   );
 }

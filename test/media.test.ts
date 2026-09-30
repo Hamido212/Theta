@@ -104,7 +104,7 @@ describe("serving", () => {
 test("deleting warns about pages that use the image and removes the files", async () => {
   const { request, pages, media, uploads } = await testSite({ login: true });
   const item = await media.add(await photo());
-  pages.save("home", { blocks: [{ id: "g", type: "gallery", images: [{ src: item.url, alt: "" }] }] });
+  pages.save("home", { blocks: [{ id: "g", type: "gallery", images: [{ src: item.url, alt: "" }], columns: 3, crop: true }] });
   expect(await (await request("/admin/media")).text()).toContain("Verwendet auf: Willkommen bei Theta");
 
   const res = await request(`/admin/media/${item.id}/delete`, form({}));
