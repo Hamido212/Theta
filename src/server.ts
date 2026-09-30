@@ -1,10 +1,17 @@
 import { join } from "node:path";
-import { Hono } from "hono";
+import { timingSafeEqual } from "node:crypto";
+import { type Context, Hono, type MiddlewareHandler } from "hono";
+import { deleteCookie, getCookie, setCookie } from "hono/cookie";
+import { csrf } from "hono/csrf";
+import { renderLogin, renderSetup, renderSetupLocked } from "./admin/pages";
+import { AuthError, AuthStore, type User } from "./auth";
 import { ValidationError, parseBlocks } from "./blocks";
+import { openDatabase } from "./db";
 import { renderEditor, renderPage } from "./render";
 import { PageStore } from "./store";
 
 const HOME = "home";
+const SESSION_COOKIE = "theta_session";
 
 // Bundles the browser editor once, on first request.
 let editorBundle: Promise<string> | undefined;
@@ -25,37 +32,146 @@ function buildEditor(): Promise<string> {
 }
 
 const asset = (path: string) => Bun.file(new URL(path, import.meta.url));
+const css = { "content-type": "text/css; charset=utf-8" };
 
-export function createApp(store: PageStore) {
-  const app = new Hono();
+export type AppOptions = {
+  pages: PageStore;
+  auth: AuthStore;
+  // Secret for the one-time setup link. Only set while no account exists.
+  setupToken?: string;
+  // Public address of the site, e.g. https://example.com, when running behind a proxy.
+  publicUrl?: string;
+};
 
-  app.get("/", (c) => c.html(renderPage(store.get(HOME)!)));
+type Env = { Variables: { user: User } };
 
-  // Prototype: the editor has no login yet, which is why the server only listens on localhost.
-  app.get("/edit", (c) => c.html(renderEditor(store.get(HOME)!)));
+export function createApp({ pages, auth, setupToken, publicUrl }: AppOptions) {
+  const app = new Hono<Env>();
+
+  // Rejects form posts from other sites, so nobody can act in the name of a logged-in user.
+  app.use(csrf(publicUrl ? { origin: new URL(publicUrl).origin } : undefined));
+
+  const currentUser = (c: Context<Env>) => {
+    const token = getCookie(c, SESSION_COOKIE);
+    return token ? auth.userForSession(token) : null;
+  };
+
+  const requireUser: MiddlewareHandler<Env> = async (c, next) => {
+    const user = currentUser(c);
+    if (!user) {
+      if (c.req.path.startsWith("/api/")) return c.json({ error: "Bitte zuerst anmelden" }, 401);
+      if (!auth.hasUsers()) return c.redirect("/setup");
+      return c.redirect(`/login?next=${encodeURIComponent(c.req.path)}`);
+    }
+    c.set("user", user);
+    await next();
+  };
+
+  const startSession = (c: Context<Env>, user: User) => {
+    const { token, expires } = auth.createSession(user.id);
+    setCookie(c, SESSION_COOKIE, token, {
+      path: "/",
+      httpOnly: true,
+      sameSite: "Lax",
+      secure: (publicUrl ?? c.req.url).startsWith("https:"),
+      expires,
+    });
+  };
+
+  const setupAllowed = (token: unknown) =>
+    !auth.hasUsers() && typeof token === "string" && setupToken !== undefined && safeEqual(token, setupToken);
+
+  // Public site
+
+  app.get("/", (c) => c.html(renderPage(pages.get(HOME)!)));
+
+  // Accounts
+
+  app.get("/login", (c) => {
+    const next = safeNext(c.req.query("next"));
+    if (!auth.hasUsers()) return c.redirect("/setup");
+    if (currentUser(c)) return c.redirect(next);
+    return c.html(renderLogin({ next }));
+  });
+
+  app.post("/login", async (c) => {
+    const form = await c.req.parseBody();
+    const email = String(form.email ?? "");
+    const next = safeNext(form.next);
+    try {
+      const user = await auth.verify(email, String(form.password ?? ""));
+      if (!user) return c.html(renderLogin({ error: "E-Mail oder Passwort ist falsch.", email, next }), 401);
+      startSession(c, user);
+      return c.redirect(next);
+    } catch (err) {
+      if (err instanceof AuthError) return c.html(renderLogin({ error: err.message, email, next }), 429);
+      throw err;
+    }
+  });
+
+  app.post("/logout", (c) => {
+    const token = getCookie(c, SESSION_COOKIE);
+    if (token) auth.deleteSession(token);
+    deleteCookie(c, SESSION_COOKIE, { path: "/" });
+    return c.redirect("/");
+  });
+
+  app.get("/setup", (c) => {
+    if (auth.hasUsers()) return c.redirect("/login");
+    const token = c.req.query("token");
+    if (!setupAllowed(token)) return c.html(renderSetupLocked(), 403);
+    return c.html(renderSetup({ token: token! }));
+  });
+
+  app.post("/setup", async (c) => {
+    if (auth.hasUsers()) return c.redirect("/login");
+    const form = await c.req.parseBody();
+    if (!setupAllowed(form.token)) return c.html(renderSetupLocked(), 403);
+
+    const input = { name: String(form.name ?? ""), email: String(form.email ?? ""), password: String(form.password ?? "") };
+    const retry = (error: string) => c.html(renderSetup({ token: String(form.token), error, name: input.name, email: input.email }), 400);
+    if (input.password !== String(form.password2 ?? "")) return retry("Die Passwörter stimmen nicht überein.");
+    try {
+      startSession(c, await auth.createUser(input));
+      return c.redirect("/edit");
+    } catch (err) {
+      if (err instanceof AuthError) return retry(err.message);
+      throw err;
+    }
+  });
+
+  // Editing (login required)
+
+  app.use("/edit", requireUser);
+  app.use("/api/*", requireUser);
+
+  app.get("/edit", (c) => c.html(renderEditor(pages.get(HOME)!)));
 
   app.get("/api/pages/:slug", (c) => {
-    const page = store.get(c.req.param("slug"));
+    const page = pages.get(c.req.param("slug"));
     return page ? c.json(page) : c.json({ error: "Seite nicht gefunden" }, 404);
   });
 
   app.put("/api/pages/:slug", async (c) => {
-    const page = store.get(c.req.param("slug"));
+    const page = pages.get(c.req.param("slug"));
     if (!page) return c.json({ error: "Seite nicht gefunden" }, 404);
 
     const body = (await c.req.json().catch(() => null)) as { title?: unknown; blocks?: unknown } | null;
     if (!body) return c.json({ error: "Ungültiges JSON" }, 400);
     try {
       const title = body.title === undefined ? page.title : parseTitle(body.title);
-      return c.json(store.save(page.slug, { title, blocks: parseBlocks(body.blocks) }));
+      return c.json(pages.save(page.slug, { title, blocks: parseBlocks(body.blocks) }));
     } catch (err) {
       if (err instanceof ValidationError) return c.json({ error: err.message }, 400);
       throw err;
     }
   });
 
-  app.get("/assets/theme.css", (c) => c.body(asset("./theme/theme.css").stream(), 200, { "content-type": "text/css; charset=utf-8" }));
-  app.get("/assets/editor.css", (c) => c.body(asset("./editor/editor.css").stream(), 200, { "content-type": "text/css; charset=utf-8" }));
+  // Static files
+
+  app.get("/assets/theme.css", (c) => c.body(asset("./theme/theme.css").stream(), 200, css));
+  app.get("/assets/admin.css", (c) => c.body(asset("./admin/admin.css").stream(), 200, css));
+  app.get("/assets/editor.css", (c) => c.body(asset("./editor/editor.css").stream(), 200, css));
   app.get("/assets/editor.js", async (c) => c.body(await buildEditor(), 200, { "content-type": "text/javascript; charset=utf-8" }));
 
   app.get("/media/:name", async (c) => {
@@ -76,13 +192,36 @@ function parseTitle(value: unknown): string {
   return value.trim();
 }
 
+// Only allow redirects to paths on this site.
+function safeNext(value: unknown): string {
+  return typeof value === "string" && value.startsWith("/") && !value.startsWith("//") && !value.includes("\\")
+    ? value
+    : "/edit";
+}
+
+function safeEqual(a: string, b: string): boolean {
+  const left = Buffer.from(a);
+  const right = Buffer.from(b);
+  return left.length === right.length && timingSafeEqual(left, right);
+}
+
 if (import.meta.main) {
-  const store = new PageStore(process.env.THETA_DB ?? "theta.db");
+  const db = openDatabase(process.env.THETA_DB ?? "theta.db");
+  const auth = new AuthStore(db);
+  const publicUrl = process.env.THETA_URL;
+  const setupToken = auth.hasUsers() ? undefined : Buffer.from(crypto.getRandomValues(new Uint8Array(18))).toString("base64url");
+
   const server = Bun.serve({
     hostname: process.env.THETA_HOST ?? "127.0.0.1",
     port: Number(process.env.PORT ?? 3000),
-    fetch: createApp(store).fetch,
+    fetch: createApp({ pages: new PageStore(db), auth, setupToken, publicUrl }).fetch,
   });
-  console.log(`Theta läuft auf ${server.url}`);
-  console.log(`Bearbeiten: ${new URL("/edit", server.url)}`);
+
+  const base = publicUrl ?? server.url;
+  console.log(`Theta läuft auf ${base}`);
+  if (setupToken) {
+    console.log(`\nNoch kein Konto vorhanden. Richte Theta hier ein:\n${new URL(`/setup?token=${setupToken}`, base)}\n`);
+  } else {
+    console.log(`Bearbeiten: ${new URL("/edit", base)}`);
+  }
 }
