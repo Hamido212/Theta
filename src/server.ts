@@ -22,7 +22,7 @@ import {
 } from "./render";
 import { PageStore, SettingsStore, parseDescription, parseTitle, slugify } from "./store";
 import { zip } from "./zip";
-import { type PresetId, PRESETS, defaultTheme, themeCss } from "./theme/tokens";
+import { type PresetId, PRESETS, defaultTheme, isFontFile, themeCss } from "./theme/tokens";
 import { isPageTemplate } from "./templates";
 
 const SESSION_COOKIE = "theta_session";
@@ -440,6 +440,12 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
   app.get("/assets/theme.css", (c) => c.body(asset("./theme/theme.css").stream(), 200, css));
   app.get("/assets/admin.css", (c) => c.body(asset("./admin/admin.css").stream(), 200, css));
   app.get("/assets/editor.css", (c) => c.body(asset("./editor/editor.css").stream(), 200, css));
+  // Bundled fonts; a new Theta version may replace a file, so browsers check back after a week.
+  app.get("/assets/fonts/:name", (c) => {
+    const name = c.req.param("name");
+    if (!isFontFile(name)) return c.notFound();
+    return new Response(asset(`./theme/fonts/${name}`), { headers: { "content-type": "font/woff2", "cache-control": "public, max-age=604800" } });
+  });
   app.get("/assets/editor.js", async (c) => c.body(await buildEditor(), 200, { "content-type": "text/javascript; charset=utf-8" }));
 
   // Uploaded images never change under their address, so browsers may keep them for a year.

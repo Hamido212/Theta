@@ -4,7 +4,7 @@ import { BLOG, HOME } from "./blocks";
 import { builtinMedia, type MediaStore } from "./media";
 import { type SiteContext, renderBlogIndex, renderFeed, renderNotFound, renderPage, renderRobots, renderSitemap } from "./render";
 import type { PageStore, SettingsStore } from "./store";
-import { themeCss } from "./theme/tokens";
+import { FONTS, fontFiles, themeCss } from "./theme/tokens";
 
 // Turns the whole site into plain files that any web host can serve, with or without
 // Theta. Public pages contain no JavaScript, so they work exactly as they do live.
@@ -37,6 +37,9 @@ export async function exportSite({ pages, settings, media }: Stores, origin: str
   files.set("sitemap.xml", encoder.encode(renderSitemap([...all, ...posts], origin)));
   files.set("robots.txt", encoder.encode(renderRobots(origin)));
   files.set("assets/theme.css", await Bun.file(new URL("./theme/theme.css", import.meta.url)).bytes());
+  for (const font of FONTS[settings.theme().fonts].web) {
+    for (const name of fontFiles(font)) files.set(`assets/fonts/${name}`, await Bun.file(new URL(`./theme/fonts/${name}`, import.meta.url)).bytes());
+  }
 
   // Copy exactly the images the pages refer to, including their smaller versions.
   const html = new TextDecoder().decode(Buffer.concat([...files.values()]));

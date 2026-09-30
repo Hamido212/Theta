@@ -327,7 +327,7 @@ select {
 
 .a-presets {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
   gap: 1rem;
 }
 
@@ -385,6 +385,11 @@ select {
 .a-grid {
   grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
   align-items: end;
+}
+
+.a-grid select {
+  width: 100%;
+  min-width: 0;
 }
 
 .a-grid .a-warning,
