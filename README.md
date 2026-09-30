@@ -29,7 +29,7 @@ Passwort vergessen? `bun run theta reset-password deine@adresse.de` setzt ein ne
 
 - **Gefunden werden.** Jede Seite hat Titel und Beschreibung für Suchmaschinen, eine kanonische Adresse und Vorschau-Daten für geteilte Links. `sitemap.xml` und `robots.txt` erzeugt Theta automatisch.
 
-Drei Blocktypen gibt es bisher: Überschrift, Text und Bild.
+Blöcke: Überschrift, Text, Bild, Galerie, Button, Spalten, Video, Zitat und Trenner. Videos von YouTube oder Vimeo laden erst, wenn jemand auf Abspielen klickt; vorher werden keine Daten an die Plattform übertragen.
 
 ## Aufbau
 

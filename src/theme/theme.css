@@ -72,7 +72,7 @@ body {
   border-radius: var(--t-radius);
 }
 
-.t-image-empty {
+.t-empty {
   display: grid;
   place-items: center;
   min-height: 12rem;
@@ -133,4 +133,113 @@ body {
   padding: var(--t-space);
   color: var(--t-color-muted);
   font-size: 0.875rem;
+}
+
+.t-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: calc(var(--t-space) / 2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.t-gallery img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: calc(var(--t-radius) / 1.5);
+}
+
+.t-buttons {
+  display: flex;
+}
+
+.t-button {
+  display: inline-block;
+  padding: 0.7em 1.4em;
+  border: 2px solid var(--t-color-accent);
+  border-radius: 999px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+}
+
+.t-button-primary {
+  background: var(--t-color-accent);
+  color: var(--t-color-bg);
+}
+
+.t-button-secondary {
+  background: transparent;
+  color: var(--t-color-accent);
+}
+
+a.t-button:hover {
+  filter: brightness(1.08);
+}
+
+.t-columns {
+  display: grid;
+  grid-template-columns: repeat(var(--t-columns, 2), minmax(0, 1fr));
+  gap: var(--t-space);
+}
+
+@media (max-width: 40rem) {
+  .t-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.t-column-title {
+  margin: 0 0 0.4em;
+  font-family: var(--t-font-heading);
+  font-size: 1.3rem;
+  line-height: 1.25;
+}
+
+.t-video {
+  margin: 0;
+}
+
+.t-video iframe,
+.t-video video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  border-radius: var(--t-radius);
+  background: #000;
+}
+
+.t-quote {
+  margin: 0;
+  padding-left: var(--t-space);
+  border-left: 4px solid var(--t-color-accent);
+}
+
+.t-quote blockquote {
+  margin: 0;
+  font-family: var(--t-font-heading);
+  font-size: 1.35rem;
+  font-style: italic;
+  line-height: 1.45;
+}
+
+.t-quote figcaption {
+  margin-top: 0.5em;
+  color: var(--t-color-muted);
+  font-size: 1rem;
+}
+
+.t-quote figcaption::before {
+  content: "— ";
+}
+
+.t-divider {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--t-color-muted) 40%, transparent);
 }

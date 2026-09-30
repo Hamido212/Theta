@@ -124,6 +124,7 @@
 }
 
 .theta-settings input,
+.theta-settings select,
 .theta-panel input,
 .theta-panel textarea {
   font: inherit;
@@ -182,4 +183,47 @@
 .theta-panel-note {
   margin: 0;
   color: var(--t-color-muted);
+}
+
+.theta-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.5rem 0 0;
+  border: 0;
+  border-top: 1px dashed color-mix(in srgb, var(--t-color-muted) 30%, transparent);
+}
+
+.theta-row legend {
+  float: left;
+  grid-column: 1 / -1;
+  padding: 0;
+  color: var(--t-color-muted);
+}
+
+.theta-row .theta-hint {
+  grid-column: 1 / -1;
+}
+
+.theta-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--t-color-muted);
+}
+
+.theta-note {
+  margin: 0;
+  color: var(--t-color-muted);
+}
+
+.theta-block .t-button .theta-editable {
+  min-width: 6ch;
+}
+
+.t-quote figcaption .theta-editable {
+  display: inline-block;
+  min-width: 10ch;
 }

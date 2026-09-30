@@ -13,7 +13,13 @@ export type SiteContext = {
 };
 
 // Data the browser editor starts with.
-export type EditorData = { page: Page; site: SiteSettings; nav: NavItem[] };
+export type EditorData = {
+  page: Page;
+  site: SiteSettings;
+  nav: NavItem[];
+  // All pages, offered as link targets.
+  pages: NavItem[];
+};
 
 function Document({ title, head, children }: { title: string; head?: ReactNode; children: ReactNode }) {
   return (

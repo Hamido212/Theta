@@ -160,7 +160,8 @@ export function createApp({ pages, settings, auth, setupToken, publicUrl }: AppO
   const editor = (c: Context<Env>, slug: string) => {
     const page = pages.get(slug);
     if (!page) return c.html(renderNotFound(siteContext(c)), 404);
-    return c.html(renderEditor({ page, site: settings.site(), nav: pages.nav() }));
+    const all = pages.list().map(({ slug, title }) => ({ slug, title }));
+    return c.html(renderEditor({ page, site: settings.site(), nav: pages.nav(), pages: all }));
   };
   app.get("/edit", (c) => editor(c, HOME));
   app.get(`/edit/${HOME}`, (c) => c.redirect("/edit"));

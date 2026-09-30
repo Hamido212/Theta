@@ -63,7 +63,7 @@ test("navigation marks the current page", () => {
 
 test("editor page embeds the page data safely", () => {
   const evil = { ...page, blocks: [{ id: "x", type: "text" as const, text: "</script><script>alert(1)</script>" }] };
-  const html = renderEditor({ page: evil, site: context.site, nav: context.nav });
+  const html = renderEditor({ page: evil, site: context.site, nav: context.nav, pages: context.nav });
   expect(html).toContain('<script type="module" src="/assets/editor.js">');
   expect(html).not.toContain("</script><script>alert(1)");
   const json = html.match(/<script id="theta-page" type="application\/json">(.*?)<\/script>/)?.[1];

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { type Block, type BlockType, HOME, type ImageBlock, type Page, blockLabels, editPath, newBlock, publicPath } from "../blocks";
+import { type Block, type BlockType, HOME, type Page, blockLabels, editPath, newBlock, publicPath } from "../blocks";
 import type { EditorData } from "../render";
 import { BlockView } from "../theme/blocks";
 import { SiteFrame } from "../theme/layout";
+import { BlockSettings } from "./settings";
 
 type SaveState = "saved" | "dirty" | "saving" | "error";
 type PageMeta = Pick<Page, "title" | "description" | "inNav">;
@@ -15,7 +16,7 @@ const saveLabels: Record<SaveState, string> = {
   error: "Speichern fehlgeschlagen",
 };
 
-function Editor({ page, site, nav }: EditorData) {
+function Editor({ page, site, nav, pages }: EditorData) {
   const [blocks, setBlocks] = useState(page.blocks);
   const [meta, setMeta] = useState<PageMeta>({ title: page.title, description: page.description, inNav: page.inNav });
   const [showSettings, setShowSettings] = useState(false);
@@ -135,7 +136,7 @@ function Editor({ page, site, nav }: EditorData) {
               </button>
             </div>
             <BlockView block={block} edit={(patch) => update(block.id, patch)} />
-            {block.type === "image" && <ImageSettings block={block} onChange={(patch) => update(block.id, patch)} />}
+            <BlockSettings block={block} onChange={(patch) => update(block.id, patch)} pages={pages} />
           </section>
         ))}
 
@@ -179,33 +180,6 @@ function PageSettings({ slug, meta, onChange }: { slug: string; meta: PageMeta; 
         </label>
       )}
       <p className="theta-panel-note">Adresse: {publicPath(slug)}</p>
-    </div>
-  );
-}
-
-function ImageSettings({ block, onChange }: { block: ImageBlock; onChange: (patch: Partial<ImageBlock>) => void }) {
-  return (
-    <div className="theta-settings">
-      <label>
-        Bild-Adresse
-        <input
-          type="url"
-          value={block.src}
-          placeholder="https://… oder /media/…"
-          onChange={(e) => onChange({ src: e.target.value })}
-        />
-      </label>
-      <label>
-        Bildbeschreibung
-        <input
-          value={block.alt}
-          placeholder="Was ist auf dem Bild zu sehen?"
-          onChange={(e) => onChange({ alt: e.target.value })}
-        />
-      </label>
-      {block.src && !block.alt.trim() && (
-        <p className="theta-hint">Ohne Beschreibung können blinde Menschen und Suchmaschinen das Bild nicht erfassen.</p>
-      )}
     </div>
   );
 }
