@@ -16,6 +16,7 @@ import {
 import type { EditorData } from "../render";
 import { BlockFlow, BlockView } from "../theme/blocks";
 import { SiteFrame } from "../theme/layout";
+import { LanguageContext } from "../theme/language";
 import { type SavedSectionTemplate, type SectionTemplate, findTemplates, insertTemplate, sectionTemplates } from "../templates";
 import { blockRange, copyBlocks, duplicateBlocks, isSectionBoundary, moveBlocks, removeBlocks, stepBlocks } from "./sections";
 import { type SharedSectionData, validateSection } from "../shared-sections";
@@ -384,6 +385,7 @@ function Editor({ page, site, nav, legal, pages, templates = [], sharedSections 
           {sharedPage && <p className="theta-notice">Du bearbeitest den gemeinsamen Abschnitt „{meta.title}“. Nach der Veröffentlichung verwenden alle eingebundenen Seiten diese Fassung. Deine gespeicherten Änderungen bleiben bis dahin privat.</p>}
           {error && <div className="theta-error-banner" role="alert"><p>{error}</p>{conflict ? <button className="theta-button" onClick={() => { discarding.current = true; window.location.reload(); }}>Eigene Änderungen verwerfen und Serverstand laden</button> : <button className="theta-button" onClick={() => void save()}>Erneut speichern</button>}</div>}
           <div className="theta-format-dock"><FormatBar /><span>Text direkt auf der Seite bearbeiten</span></div>
+      <LanguageContext.Provider value={site.language ?? "de"}>
       <SiteFrame site={site} nav={nav} legal={legal} current={post ? BLOG : page.slug} linkTo={editPath}>
         {post && (
           <p className="t-post-meta">
@@ -482,6 +484,7 @@ function Editor({ page, site, nav, legal, pages, templates = [], sharedSections 
           <AddMenu custom={customTemplates} sectionOnly={sharedPage} shared={shared} onShared={(item) => addShared(item, blocks.length)} onAdd={(type) => add(type, blocks.length)} onTemplate={(template) => addTemplate(template, blocks.length)} />
         </div>
       </SiteFrame>
+      </LanguageContext.Provider>
         </div>
         <aside className={`theta-sidebar theta-inspector ${side === "inspector" ? "theta-side-open" : ""}`} aria-label="Einstellungen">
           <div className="theta-publication"><h2>Veröffentlichung</h2><strong>{publishedAt ? "Live-Version vorhanden" : "Noch nicht veröffentlicht"}</strong><p>{savedPage.hasChanges || state !== "saved" ? "Änderungen bleiben im Entwurf, bis du sie veröffentlichst." : "Besucher sehen diese Fassung."}</p>

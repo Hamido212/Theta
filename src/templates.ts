@@ -161,7 +161,11 @@ const pages = {
   },
   contact: {
     label: "Kontakt",
-    drafts: (title: string) => [heading(title, 1), ...contactDetails()],
+    // The map follows the address, so visitors see right away where to find you.
+    drafts: (title: string) => {
+      const [address, ...rest] = contactDetails();
+      return [heading(title, 1), address!, strip(newBlock("map")), ...rest];
+    },
   },
   agency: {
     label: "Agentur · Startseite",

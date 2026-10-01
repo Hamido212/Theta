@@ -457,6 +457,42 @@ a.t-column-link:hover {
   background: #000;
 }
 
+.t-map {
+  margin: 0;
+}
+
+.t-map iframe {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 16rem;
+  border: 0;
+  border-radius: var(--t-radius);
+  background: #ecebe4;
+}
+
+.t-width-full.t-map iframe {
+  border-radius: 0;
+}
+
+.t-map figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  margin-top: 0.5rem;
+  color: var(--t-color-muted);
+  font-size: 0.9rem;
+}
+
+.t-map-label {
+  color: var(--t-color-text);
+}
+
+.t-map figcaption a {
+  color: inherit;
+}
+
 .t-quote {
   margin: 0;
   padding-left: var(--t-space);

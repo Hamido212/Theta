@@ -6,6 +6,7 @@ import { BlockFlow, BlockView } from "./theme/blocks";
 import { type ImageLookup, Img, ImageLookupContext } from "./theme/image";
 import { SiteFrame } from "./theme/layout";
 import { FormContext, type FormSetup } from "./theme/form";
+import { LanguageContext } from "./theme/language";
 import { expandSharedSections, type SharedSectionData, type SharedSections } from "./shared-sections";
 
 // What every page needs to know about the site around it.
@@ -127,9 +128,11 @@ export function renderPage(page: Page, { site, nav, legal = [], origin, images =
       <ImageLookupContext.Provider value={images}>
         <SiteFrame site={site} nav={nav} legal={legal} current={post ? BLOG : page.slug} linkTo={publicPath}>
           {post && <PostDate page={page} language={site.language} />}
-          <FormContext.Provider value={form ?? null}>
-            <BlockFlow blocks={page.blocks}>{(block) => <BlockView key={block.id} block={block} />}</BlockFlow>
-          </FormContext.Provider>
+          <LanguageContext.Provider value={site.language ?? "de"}>
+            <FormContext.Provider value={form ?? null}>
+              <BlockFlow blocks={page.blocks}>{(block) => <BlockView key={block.id} block={block} />}</BlockFlow>
+            </FormContext.Provider>
+          </LanguageContext.Provider>
           {post && (
             <p className="t-post-back">
               <a href={`/${BLOG}`}>{site.language === "en" ? "← All posts" : "← Alle Beiträge"}</a>

@@ -8,6 +8,7 @@ import { renderBlog, renderDashboard, renderDesign, renderLogin, renderMediaLibr
 import { AuthError, AuthStore, type User } from "./auth";
 import { BLOG, type FormBlock, HOME, type NavItem, type Page, ValidationError, editPath, pagePath, parseBlocks, publicPath } from "./blocks";
 import { ContactStore, RateLimit, parseSubmission } from "./contact";
+import { type Geocoder, nominatim } from "./geocode";
 import { openDatabase } from "./db";
 import { exportSite } from "./export";
 import { MAX_UPLOAD_BYTES, type MediaItem, MediaStore, builtinMedia } from "./media";
@@ -62,11 +63,13 @@ export type AppOptions = {
   publicUrl?: string;
   // Inbox for contact forms. Without it, forms are left out of pages.
   contact?: ContactStore;
+  // Address search for the map block; OpenStreetMap's Nominatim unless replaced (tests).
+  geocoder?: Geocoder;
 };
 
 type Env = { Variables: { user: User } };
 
-export function createApp({ pages, settings, media, auth, setupToken, publicUrl, contact }: AppOptions) {
+export function createApp({ pages, settings, media, auth, setupToken, publicUrl, contact, geocoder = nominatim() }: AppOptions) {
   const app = new Hono<Env>();
 
   const siteContext = (c: Context<Env>): SiteContext => ({
@@ -699,6 +702,18 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl,
       if (err instanceof ConflictError) return c.json({ error: err.message, conflict: true }, 409);
       if (err instanceof ValidationError) return c.json({ error: err.message, block: err.block }, 400);
       throw err;
+    }
+  });
+
+  // Address search for the map block in the editor.
+  app.get("/api/geocode", async (c) => {
+    const query = (c.req.query("q") ?? "").trim();
+    if (query.length < 3 || query.length > 200) return c.json({ error: "Bitte eine Adresse mit mindestens drei Zeichen eingeben" }, 400);
+    try {
+      return c.json(await geocoder(query, settings.site().language ?? "de"));
+    } catch (err) {
+      console.error("Ortssuche fehlgeschlagen:", err instanceof Error ? err.message : err);
+      return c.json({ error: "Die Suche bei OpenStreetMap hat gerade nicht geklappt. Du kannst stattdessen einen Kartenlink einfügen." }, 502);
     }
   });
 

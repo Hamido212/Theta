@@ -290,6 +290,19 @@
   color: var(--t-color-muted);
 }
 
+.theta-places {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.theta-places .theta-button {
+  width: 100%;
+  text-align: left;
+}
+
 .theta-address {
   display: grid;
   gap: 0.5rem;
