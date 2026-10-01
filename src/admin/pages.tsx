@@ -18,6 +18,7 @@ import {
   fontFaces,
 } from "../theme/tokens";
 import { pageTemplates } from "../templates";
+import type { SharedSectionData } from "../shared-sections";
 
 // Server-rendered admin screens. They work without JavaScript: plain forms that post back.
 
@@ -120,7 +121,7 @@ export function renderSetupLocked() {
   );
 }
 
-function AdminBar({ user, current }: { user: User; current: "pages" | "blog" | "media" | "design" }) {
+function AdminBar({ user, current }: { user: User; current: "pages" | "blog" | "media" | "design" | "sections" }) {
   return (
     <header className="a-bar">
       <strong>θ Theta</strong>
@@ -135,6 +136,7 @@ function AdminBar({ user, current }: { user: User; current: "pages" | "blog" | "
           Mediathek
         </a>
         <a href="/admin/trash">Papierkorb</a>
+        <a href="/admin/shared-sections" aria-current={current === "sections" ? "page" : undefined}>Gemeinsame Abschnitte</a>
         <a href="/admin/design" aria-current={current === "design" ? "page" : undefined}>
           Design
         </a>
@@ -562,8 +564,28 @@ export function renderTrash({ user, pages, error }: { user: User; pages: Page[];
     <main className="a-main"><h1>Papierkorb</h1><ErrorMessage error={error} />
       <p>Gelöschte Seiten und ihr Verlauf bleiben erhalten. Wiederhergestellte Seiten starten als Entwurf.</p>
       {pages.length === 0 ? <p>Der Papierkorb ist leer.</p> : <ul className="a-list">{pages.map((page) => <li key={page.slug}>
-        <div className="a-grow"><strong>{page.title}</strong><p className="a-muted">{page.kind === "post" ? "Beitrag" : "Seite"} · {page.deletedAt && formatDate(page.deletedAt)}</p></div>
+        <div className="a-grow"><strong>{page.title}</strong><p className="a-muted">{page.kind === "post" ? "Beitrag" : page.kind === "section" ? "Gemeinsamer Abschnitt" : "Seite"} · {page.deletedAt && formatDate(page.deletedAt)}</p></div>
         <form method="post" action={`/admin/trash/${page.slug}/restore`}><input type="hidden" name="version" value={page.version} /><button>Als Entwurf wiederherstellen</button></form>
       </li>)}</ul>}
+    </main></body></html>);
+}
+
+export function renderSharedSections({ user, sections, error }: { user: User; sections: SharedSectionData[]; error?: string }) {
+  return html(<html lang="de"><AdminHead title="Gemeinsame Abschnitte" /><body>
+    <AdminBar user={user} current="sections" />
+    <main className="a-main"><h1>Gemeinsame Abschnitte</h1><ErrorMessage error={error} />
+      <p>Einmal bearbeiten, auf mehreren Seiten verwenden. Gespeicherte Änderungen bleiben Entwürfe. Erst „Veröffentlichen“ übernimmt sie auf allen eingebundenen Seiten.</p>
+      <form method="post" action="/admin/shared-sections" className="a-form">
+        <label>Name<input name="title" required maxLength={200} placeholder="Zum Beispiel: Projektanfrage" /></label>
+        <button>Gemeinsamen Abschnitt anlegen</button>
+      </form>
+      <ul className="a-list">{sections.map(({ page, usage }) => <li key={page.slug}>
+        <div className="a-grow"><a href={editPath(page.slug)}><strong>{page.title}</strong></a><p className="a-muted">{page.publishedAt ? page.hasChanges ? "Live-Fassung vorhanden · Änderungen im Entwurf" : "Veröffentlicht" : "Entwurf"} · {usage.length} {usage.length === 1 ? "Einbindung" : "Einbindungen"}</p>
+          {usage.length > 0 && <ul>{usage.map((item) => <li key={item.slug}><a href={item.href}>{item.title}</a></li>)}</ul>}
+        </div>
+        <a className="a-link" href={editPath(page.slug)}>Bearbeiten</a>
+        <form method="post" action={`/admin/shared-sections/${page.slug}/delete`}><input type="hidden" name="version" value={page.version} /><button disabled={usage.length > 0} title={usage.length ? "Zuerst die Einbindungen entfernen oder in Kopien umwandeln" : "In den Papierkorb verschieben"}>In den Papierkorb</button></form>
+      </li>)}</ul>
+      {sections.length === 0 && <p>Noch keine gemeinsamen Abschnitte. Du kannst auch einen vorhandenen Abschnitt im Editor über „Gemeinsam pflegen“ übernehmen.</p>}
     </main></body></html>);
 }

@@ -10,11 +10,13 @@ import {
   type RevisionSummary,
   type SiteSettings,
   ValidationError,
+  editPath,
   isSafeImageSrc,
   parseBlocks,
 } from "./blocks";
 import { type ThemeSettings, defaultTheme, parseTheme } from "./theme/tokens";
 import { type SavedSectionTemplate, type PageTemplateId, pageBlocks } from "./templates";
+import { validateSection } from "./shared-sections";
 
 type PageRow = {
   slug: string;
@@ -104,6 +106,25 @@ export class PageStore {
       .flatMap((row) => toLive(row) ?? []);
   }
 
+  sharedSections(): Page[] {
+    return this.db.query<PageRow, []>(`SELECT ${PAGE_COLUMNS} FROM pages WHERE kind = 'section' AND deleted_at IS NULL ORDER BY title`).all().map(toPage);
+  }
+
+  sharedUsage(slug: string): NavItem[] {
+    return this.db.query<PageRow, []>(`SELECT ${PAGE_COLUMNS} FROM pages WHERE kind != 'section' AND deleted_at IS NULL`).all().flatMap((row) => {
+      const page = toPage(row), live = toLive(row);
+      const uses = (blocks: Block[]) => blocks.some((block) => block.type === "shared" && block.sectionId === slug);
+      return uses(page.blocks) || (live && uses(live.blocks)) ? [{ slug: page.slug, title: page.title, href: editPath(page.slug) }] : [];
+    });
+  }
+
+  createShared(title: unknown, input: unknown, author = ""): Page {
+    const blocks = parseBlocks(input);
+    validateSection(blocks);
+    if (this.sharedSections().length >= 100) throw new ValidationError("Höchstens 100 gemeinsame Abschnitte. Entferne zuerst einen ungenutzten Abschnitt.");
+    return this.create(parseTitle(title), author, "section", "blank", blocks);
+  }
+
   // Keep images referenced by drafts, live snapshots, history and trash recoverable.
   all(): Page[] {
     const rows = this.db.query<PageRow, []>(`SELECT ${PAGE_COLUMNS} FROM pages`).all();
@@ -140,14 +161,15 @@ export class PageStore {
   }
 
   // Creates a page or post from a title and returns it. The address is derived from the title.
-  create(title: string, author = "", kind: PageKind = "page", template: PageTemplateId = "blank"): Page {
+  create(title: string, author = "", kind: PageKind = "page", template: PageTemplateId = "blank", initialBlocks?: Block[]): Page {
     const cleanTitle = parseTitle(title);
     const base = slugify(cleanTitle);
     let slug = base;
     for (let n = 2; RESERVED_SLUGS.has(slug) || this.db.query("SELECT 1 FROM pages WHERE slug = ?").get(slug); n++) slug = `${base}-${n}`;
 
     const { next } = this.db.query<{ next: number }, []>("SELECT COALESCE(MAX(position), 0) + 1 AS next FROM pages").get()!;
-    const blocks = pageBlocks(template, cleanTitle);
+    const blocks = parseBlocks(initialBlocks ?? pageBlocks(template, cleanTitle));
+    if (kind === "section") validateSection(blocks);
     if (kind === "post") blocks.push({ id: crypto.randomUUID(), type: "text", text: "" });
     this.insert(slug, { title: cleanTitle, blocks, kind }, next);
     const page = this.get(slug)!;
@@ -168,6 +190,8 @@ export class PageStore {
       const { published, ...rest } = changes;
       const defined = Object.fromEntries(Object.entries(rest).filter(([, value]) => value !== undefined));
       const next = { ...page, ...defined };
+      if (page.kind === "section") { validateSection(parseBlocks(next.blocks)); next.inNav = false; }
+      else this.checkSharedReferences(next.blocks);
       const changed = contentKey(page) !== contentKey(next);
       if (changed) {
         this.db.query("UPDATE pages SET title = ?, description = ?, in_nav = ?, blocks = ?, updated_at = ?, version = version + 1 WHERE slug = ?")
@@ -186,6 +210,10 @@ export class PageStore {
       if (!page) throw new ValidationError("Seite nicht gefunden");
       checkVersion(page, version);
       if (slug === HOME && !published) throw new ValidationError("Die Startseite bleibt veröffentlicht. Veröffentliche stattdessen eine neue Fassung.");
+      if (page.kind === "section") {
+        validateSection(page.blocks);
+        if (!published && this.sharedUsage(slug).length) throw new ValidationError("Dieser Abschnitt wird auf Seiten verwendet. Entferne zuerst die Einbindungen, bevor du seine Veröffentlichung zurücknimmst.");
+      } else if (published) this.checkSharedReferences(page.blocks, true);
       const now = new Date().toISOString();
       const data = published ? JSON.stringify({ ...contentData(page), updatedAt: now }) : null;
       this.db.query("UPDATE pages SET live_data = ?, published_at = ?, version = version + 1 WHERE slug = ?")
@@ -245,6 +273,7 @@ export class PageStore {
     const page = this.get(slug);
     if (!page) throw new ValidationError("Seite nicht gefunden");
     checkVersion(page, version);
+    if (page.kind === "section" && this.sharedUsage(slug).length) throw new ValidationError("Dieser Abschnitt wird auf Seiten verwendet. Entferne zuerst die Einbindungen oder wandle sie in unabhängige Kopien um.");
     this.db.query("UPDATE pages SET deleted_at = ?, version = version + 1 WHERE slug = ?")
       .run(new Date().toISOString(), slug);
   }
@@ -275,6 +304,16 @@ export class PageStore {
       .query("INSERT INTO pages (slug, kind, title, description, in_nav, position, blocks, updated_at) VALUES (?, ?, ?, '', ?, ?, ?, ?)")
       .run(slug, kind, page.title, kind === "page" ? 1 : 0, position, JSON.stringify(page.blocks), new Date().toISOString());
   }
+
+  private checkSharedReferences(blocks: Block[], published = false) {
+    blocks.forEach((block, index) => {
+      if (block.type !== "shared") return;
+      const section = published ? this.live(block.sectionId) : this.get(block.sectionId);
+      if (section?.kind !== "section") throw new ValidationError(published
+        ? "Veröffentliche zuerst den eingebundenen gemeinsamen Abschnitt."
+        : "Der gemeinsame Abschnitt ist nicht mehr vorhanden. Entferne die Einbindung oder wähle einen anderen Abschnitt.", index);
+    });
+  }
 }
 
 export class SettingsStore {
@@ -287,7 +326,7 @@ export class SettingsStore {
 
   saveTemplate(title: unknown, input: unknown): SavedSectionTemplate {
     const blocks = parseBlocks(input);
-    if (blocks.length < 2 || blocks[0]?.type !== "section" || blocks.slice(1).some((b) => b.type === "section")) throw new ValidationError("Bitte einen Abschnitt mit Inhalt auswählen.");
+    if (blocks.length < 2 || blocks[0]?.type !== "section" || blocks.slice(1).some((block) => block.type === "section" || block.type === "shared")) throw new ValidationError("Bitte einen unabhängigen Abschnitt mit Inhalt auswählen.");
     if (this.templates().length >= 100) throw new ValidationError("Höchstens 100 eigene Vorlagen. Lösche zuerst eine nicht mehr benötigte Vorlage.");
     const template = { id: crypto.randomUUID(), title: parseTitle(title), blocks };
     this.db.query("INSERT INTO section_templates (id, title, blocks, created_at) VALUES (?, ?, ?, ?)")
@@ -414,7 +453,7 @@ function toLive(row: PageRow): Page | null {
 function toPage(row: PageRow): Page {
   return {
     slug: row.slug,
-    kind: row.kind === "post" ? "post" : "page",
+    kind: row.kind === "post" ? "post" : row.kind === "section" ? "section" : "page",
     title: row.title,
     description: row.description,
     inNav: row.in_nav === 1,

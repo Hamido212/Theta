@@ -72,7 +72,7 @@ export function BlockSettings({ block, onChange, pages }: Props<Block>) {
 }
 
 // Controlled block variants shown in the inspector.
-export function BlockOptions({ block, onChange }: { block: Block; onChange: (patch: Partial<Block>) => void }) {
+export function BlockOptions({ block, onChange, allowTitle = true }: { block: Block; onChange: (patch: Partial<Block>) => void; allowTitle?: boolean }) {
   if (block.type === "heading") {
     return (
       <select
@@ -80,7 +80,7 @@ export function BlockOptions({ block, onChange }: { block: Block; onChange: (pat
         value={block.level}
         onChange={(e) => onChange({ level: Number(e.target.value) as HeadingLevel } as Partial<HeadingBlock>)}
       >
-        <option value={1}>Seitentitel</option>
+        {allowTitle && <option value={1}>Seitentitel</option>}
         <option value={2}>Überschrift</option>
         <option value={3}>Kleine Überschrift</option>
       </select>
@@ -208,6 +208,7 @@ function HeroSettings({ block, onChange, pages }: Props<HeroBlock>) {
     onChange({ buttons: block.buttons.map((button, i) => (i === index ? { ...button, href } : button)) });
   return (
     <div className="theta-settings">
+      {block.layout !== "profile" && <label>Inhaltsbreite des Titelbilds<select value={block.width ?? "content"} onChange={(event) => onChange({ width: event.target.value as HeroBlock["width"] })}><option value="content">Textbreite</option><option value="wide">Breit</option><option value="full">Ganze Fensterbreite</option></select></label>}
       <label>Darstellung<select value={block.layout ?? "banner"} onChange={(e) => onChange({ layout: e.target.value as HeroBlock["layout"] })}><option value="banner">Großes Titelbild</option><option value="profile">Profil mit Porträt</option></select></label>
       {block.layout === "profile" && <>
         <label>Kurzbezeichnung<input value={block.eyebrow ?? ""} onChange={(e) => onChange({ eyebrow: e.target.value })} /></label>

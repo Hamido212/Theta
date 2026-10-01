@@ -25,9 +25,11 @@ export type DividerBlock = { id: string; type: "divider" };
 // Starts a new full-width band of the page. Everything up to the next section shares its background.
 export type SectionBackground = "plain" | "soft" | "accent" | "inverse";
 export type SectionBlock = { id: string; type: "section"; background: SectionBackground; width?: "content" | "wide" | "full"; spacing?: "compact" | "normal" | "spacious"; align?: "left" | "center" };
+// References a centrally edited section; its draft is never rendered on live pages.
+export type SharedBlock = { id: string; type: "shared"; sectionId: string };
 // A full-width banner or compact profile, with title, text and up to two buttons.
 export type HeroButton = { label: string; href: string };
-export type HeroBlock = { id: string; type: "hero"; focal?: FocalPoint; title: string; text: string; src: string; alt: string; buttons: HeroButton[]; layout?: "banner" | "profile"; eyebrow?: string; highlight?: string; links?: HeroButton[] };
+export type HeroBlock = { id: string; type: "hero"; focal?: FocalPoint; title: string; text: string; src: string; alt: string; buttons: HeroButton[]; width?: "content" | "wide" | "full"; layout?: "banner" | "profile"; eyebrow?: string; highlight?: string; links?: HeroButton[] };
 // A menu or price list: name and price on one line, an optional description below.
 export type PriceItem = { name: string; description: string; price: string };
 export type PricesBlock = { id: string; type: "prices"; items: PriceItem[] };
@@ -52,6 +54,7 @@ export type Block =
   | QuoteBlock
   | DividerBlock
   | SectionBlock
+  | SharedBlock
   | HeroBlock
   | PricesBlock
   | FaqBlock
@@ -59,7 +62,7 @@ export type Block =
   | TeamBlock;
 export type BlockType = Block["type"];
 
-export type PageKind = "page" | "post";
+export type PageKind = "page" | "post" | "section";
 
 export type Page = {
   slug: string;
@@ -137,6 +140,7 @@ export const blockLabels: Record<BlockType, string> = {
   quote: "Zitat",
   divider: "Trenner",
   section: "Abschnitt",
+  shared: "Gemeinsamer Abschnitt",
   hero: "Titelbild",
   prices: "Preisliste",
   faq: "Fragen & Antworten",
@@ -181,6 +185,8 @@ export function newBlock(type: BlockType, id: string = crypto.randomUUID()): Blo
       return { id, type };
     case "section":
       return { id, type, background: "soft" };
+    case "shared":
+      return { id, type, sectionId: "" };
     case "hero":
       return { id, type, title: "", text: "", src: "", alt: "", buttons: [emptyHeroButton()] };
     case "prices":
@@ -361,6 +367,11 @@ export function parseBlocks(input: unknown): Block[] {
           ...(value.spacing !== undefined && { spacing: value.spacing === "compact" || value.spacing === "spacious" ? value.spacing : "normal" }),
           ...(value.align !== undefined && { align: value.align === "center" ? "center" : "left" }),
         };
+      case "shared": {
+        const sectionId = string(value.sectionId, `${where}.sectionId`, 100);
+        if (!/^[a-z0-9-]+$/.test(sectionId)) throw new ValidationError(`${where}: Bitte einen gemeinsamen Abschnitt auswählen`);
+        return { id, type: "shared", sectionId };
+      }
       case "hero": {
         // The hero's title is the page title.
         hasTitle = true;
@@ -370,6 +381,7 @@ export function parseBlocks(input: unknown): Block[] {
         });
         return {
           id, type: "hero", title: string(value.title, `${where}.title`, 500), text: string(value.text, `${where}.text`, 2_000), ...image(value, where), buttons,
+          ...(value.width !== undefined && { width: value.width === "wide" || value.width === "full" ? value.width : "content" }),
           ...(value.layout !== undefined && { layout: value.layout === "profile" ? "profile" : "banner" }),
           ...(value.eyebrow !== undefined && { eyebrow: string(value.eyebrow, `${where}.eyebrow`, 200) }),
           ...(value.highlight !== undefined && { highlight: string(value.highlight, `${where}.highlight`, 200) }),
