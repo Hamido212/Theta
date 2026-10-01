@@ -31,7 +31,7 @@
 - [x] Gesamte Testsuite und TypeScript-Prüfung.
 - [x] Browserprüfung mit isolierten Testdaten; HYOS-Inhalte erhalten.
 - [x] Dokumentation der Bedienung und Speicher-API.
-- [ ] Commit, Push und GitHub-PR.
+- [x] Commit, Push und GitHub-PR: [PR #21](https://github.com/Hamido212/Theta/pull/21), Branch `feat/hyos-editor-improvements`.
 
 ## Prüfergebnisse vom 1. Oktober 2026
 
