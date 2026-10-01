@@ -20,6 +20,7 @@ import {
 import { pageTemplates } from "../templates";
 import type { SharedSectionData } from "../shared-sections";
 import type { MailSettings, Message } from "../contact";
+import type { Redirect } from "../redirects";
 
 // Server-rendered admin screens. They work without JavaScript: plain forms that post back.
 
@@ -166,6 +167,7 @@ type DashboardProps = {
   // Contact forms: unread messages, and whether a live page has a form.
   unread?: number;
   hasForm?: boolean;
+  redirects?: Redirect[];
 };
 
 function PageChoice({ name, label, value, pages }: { name: string; label: string; value: string; pages: Page[] }) {
@@ -186,7 +188,7 @@ function PageChoice({ name, label, value, pages }: { name: string; label: string
   );
 }
 
-export function renderDashboard({ user, pages, site, media, origin, error, unread = 0, hasForm = false }: DashboardProps) {
+export function renderDashboard({ user, pages, site, media, origin, error, unread = 0, hasForm = false, redirects = [] }: DashboardProps) {
   const movable = pages.filter((page) => page.slug !== HOME);
   return html(
     <html lang="de">
@@ -266,6 +268,49 @@ export function renderDashboard({ user, pages, site, media, origin, error, unrea
                 ))}
               </select>
               <button className="a-primary">Seite anlegen</button>
+            </form>
+          </section>
+
+          <section className="a-section" id="weiterleitungen">
+            <h2>Weiterleitungen</h2>
+            <p className="a-muted">
+              Bekommt eine veröffentlichte Seite eine neue Adresse, leitet Theta die alte automatisch weiter. Hier kannst du auch Adressen deiner bisherigen
+              Website auf die neuen Seiten umleiten, damit Links und Suchergebnisse weiter funktionieren.
+            </p>
+            {redirects.length > 0 && (
+              <details className="a-redirects" open={redirects.length <= 10}>
+                <summary>{redirects.length === 1 ? "1 Weiterleitung" : `${redirects.length} Weiterleitungen`}</summary>
+                <ul className="a-list">
+                  {redirects.map((redirect) => (
+                    <li key={redirect.from}>
+                      <div className="a-grow">
+                        <span className="a-redirect">
+                          <code>{redirect.from}</code> → <a href={redirect.to}>{redirect.to}</a>
+                        </span>
+                        <span className="a-muted">
+                          {redirect.reason === "rename" ? "Nach Adressänderung, " : ""}seit {new Date(redirect.createdAt).toLocaleDateString("de-DE", { dateStyle: "medium" })}
+                        </span>
+                      </div>
+                      <form method="post" action="/admin/redirects/delete">
+                        <input type="hidden" name="from" value={redirect.from} />
+                        <button aria-label={`Weiterleitung von ${redirect.from} entfernen`}>Entfernen</button>
+                      </form>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+            <form method="post" action="/admin/redirects" className="a-inline">
+              <input name="from" required maxLength={500} placeholder="Alte Adresse, z. B. /ueber-uns.html" aria-label="Alte Adresse" />
+              <input name="to" required maxLength={1000} placeholder="Ziel, z. B. /ueber-uns" aria-label="Ziel" list="a-redirect-targets" />
+              <datalist id="a-redirect-targets">
+                {pages.map((page) => (
+                  <option key={page.slug} value={publicPath(page.slug)}>
+                    {page.title}
+                  </option>
+                ))}
+              </datalist>
+              <button className="a-primary">Weiterleitung anlegen</button>
             </form>
           </section>
 

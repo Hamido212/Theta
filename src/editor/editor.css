@@ -290,6 +290,31 @@
   color: var(--t-color-muted);
 }
 
+.theta-address {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.theta-address-input {
+  display: flex;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--t-color-muted) 35%, transparent);
+  border-radius: 8px;
+  color: var(--t-color-text);
+}
+
+.theta-address-input > span {
+  padding-left: 0.6rem;
+  color: var(--t-color-muted);
+}
+
+.theta-panel .theta-address-input input {
+  flex: 1;
+  min-width: 0;
+  padding-left: 0.1rem;
+  border: 0;
+}
+
 .theta-row {
   display: grid;
   grid-template-columns: 1fr 1fr auto;

@@ -159,6 +159,8 @@ h1 {
   margin: 0 auto;
   padding: 1.5rem 1rem 3rem;
   display: grid;
+  /* Long content wraps instead of widening the page on phones. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.5rem;
 }
 
@@ -526,5 +528,14 @@ select {
 .a-message-text {
   margin-top: 0.5rem !important;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.a-redirects summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.a-redirect {
   overflow-wrap: anywhere;
 }

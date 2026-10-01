@@ -76,6 +76,12 @@ const migrations: string[] = [
      read_at    TEXT,
      mail       TEXT NOT NULL
    )`,
+  `CREATE TABLE redirects (
+     from_path  TEXT PRIMARY KEY,
+     to_path    TEXT NOT NULL,
+     reason     TEXT NOT NULL,
+     created_at TEXT NOT NULL
+   )`,
 ];
 
 export function openDatabase(path: string): Database {
