@@ -1,4 +1,4 @@
-import { type CSSProperties, Fragment, type ReactNode } from "react";
+import { type CSSProperties, Fragment, type ReactNode, useContext } from "react";
 import type {
   Block,
   ButtonBlock,
@@ -9,6 +9,7 @@ import type {
   HeroBlock,
   HoursBlock,
   ImageBlock,
+  MapBlock,
   PricesBlock,
   QuoteBlock,
   SectionBlock,
@@ -22,6 +23,8 @@ import { Img } from "./image";
 import { videoPlaceholder, videoSource } from "./video";
 import { SocialIcon } from "./icons";
 import { ContactForm } from "./form";
+import { LanguageContext } from "./language";
+import { mapLink, mapPlaceholder } from "./map";
 
 // The default theme. Every block component renders on the server (edit is undefined)
 // and inside the editor (edit updates the block), so both views look identical.
@@ -188,6 +191,29 @@ function Video({ block, edit }: BlockProps<VideoBlock>) {
         allowFullScreen
         loading="lazy"
       />
+    </figure>
+  );
+}
+
+// The map waits behind a placeholder until a visitor clicks, like videos. The link below
+// opens the place on openstreetmap.org, for directions or a bigger view.
+function PlaceMap({ block, edit }: BlockProps<MapBlock>) {
+  const language = useContext(LanguageContext);
+  if (block.lat === null || block.lon === null) return edit ? <Empty>Noch kein Ort gewählt. Suche ihn rechts in den Einstellungen.</Empty> : null;
+  const place = { lat: block.lat, lon: block.lon };
+  return (
+    <figure className={`t-map t-width-${block.width}`}>
+      <iframe title={block.label.trim() || (language === "en" ? "Map" : "Karte")} srcDoc={mapPlaceholder(place, block.zoom, block.label, language)} loading="lazy" />
+      <figcaption>
+        {(edit || block.label.trim()) && (
+          <span className="t-map-label">
+            <TextField value={block.label} onChange={edit && ((label) => edit({ label }))} placeholder="Adresse oder Name des Ortes" />
+          </span>
+        )}
+        <a href={mapLink(place, block.zoom)} target={edit ? "_blank" : undefined} rel="noopener">
+          {language === "en" ? "Open in OpenStreetMap" : "In OpenStreetMap öffnen"}
+        </a>
+      </figcaption>
     </figure>
   );
 }
@@ -489,5 +515,7 @@ export function BlockView({ block, edit }: BlockProps<Block>) {
       return <Team block={block} edit={e} />;
     case "form":
       return <ContactForm block={block} edit={e} />;
+    case "map":
+      return <PlaceMap block={block} edit={e} />;
   }
 }

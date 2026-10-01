@@ -3,6 +3,7 @@
 // never styling. Styling comes from the theme, so editors cannot break the design.
 
 import { plainText } from "./richtext";
+import { MAX_ZOOM, MIN_ZOOM } from "./theme/map";
 
 // Level 1 is the page title (one per page), 2 a section heading, 3 a smaller subheading.
 export type HeadingLevel = 1 | 2 | 3;
@@ -45,6 +46,8 @@ export type TeamBlock = { id: string; type: "team"; members: TeamMember[] };
 // A contact form. Visitors send name, e-mail address, optionally a phone number, and a message;
 // it arrives in the admin inbox and, if a mail server is set up, by e-mail.
 export type FormBlock = { id: string; type: "form"; button: string; success: string; phone: boolean };
+// A place on an OpenStreetMap map that only loads when a visitor clicks. lat/lon are null until a place is chosen.
+export type MapBlock = { id: string; type: "map"; lat: number | null; lon: number | null; zoom: number; label: string; width: ImageWidth };
 
 export type Block =
   | HeadingBlock
@@ -62,6 +65,7 @@ export type Block =
   | PricesBlock
   | FaqBlock
   | FormBlock
+  | MapBlock
   | HoursBlock
   | TeamBlock;
 export type BlockType = Block["type"];
@@ -151,6 +155,7 @@ export const blockLabels: Record<BlockType, string> = {
   hours: "Öffnungszeiten",
   team: "Team",
   form: "Kontaktformular",
+  map: "Karte",
 };
 
 export const sectionBackgrounds: Record<SectionBackground, string> = {
@@ -213,6 +218,8 @@ export function newBlock(type: BlockType, id: string = crypto.randomUUID()): Blo
       return { id, type, members: [emptyTeamMember(), emptyTeamMember(), emptyTeamMember()] };
     case "form":
       return { id, type, button: "Nachricht senden", success: "Danke für deine Nachricht! Wir melden uns bald.", phone: false };
+    case "map":
+      return { id, type, lat: null, lon: null, zoom: 16, label: "", width: "normal" };
   }
 }
 
@@ -437,6 +444,22 @@ export function parseBlocks(input: unknown): Block[] {
             ...image(member, at),
           })),
         };
+      case "map": {
+        const place = value.lat === null && value.lon === null ? null : { lat: value.lat, lon: value.lon };
+        if (place && !(typeof place.lat === "number" && typeof place.lon === "number" && Math.abs(place.lat) <= 90 && Math.abs(place.lon) <= 180)) {
+          throw new ValidationError(`${where}: Der Ort auf der Karte muss gültige Koordinaten haben`);
+        }
+        const zoom = Number.isInteger(value.zoom) && (value.zoom as number) >= MIN_ZOOM && (value.zoom as number) <= MAX_ZOOM ? (value.zoom as number) : 16;
+        return {
+          id,
+          type: "map",
+          lat: place ? (place.lat as number) : null,
+          lon: place ? (place.lon as number) : null,
+          zoom,
+          label: string(value.label, `${where}.label`, 200),
+          width: value.width === "wide" || value.width === "full" ? value.width : "normal",
+        };
+      }
       case "form":
         return {
           id,

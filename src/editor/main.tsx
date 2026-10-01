@@ -1,4 +1,4 @@
-import { type DragEvent, useCallback, useEffect, useRef, useState } from "react";
+import { type DragEvent, type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   BLOG,
@@ -16,6 +16,7 @@ import {
 import type { EditorData } from "../render";
 import { BlockFlow, BlockView } from "../theme/blocks";
 import { SiteFrame } from "../theme/layout";
+import { LanguageContext } from "../theme/language";
 import { type SavedSectionTemplate, type SectionTemplate, findTemplates, insertTemplate, sectionTemplates } from "../templates";
 import { blockRange, copyBlocks, duplicateBlocks, isSectionBoundary, moveBlocks, removeBlocks, stepBlocks } from "./sections";
 import { type SharedSectionData, validateSection } from "../shared-sections";
@@ -224,6 +225,24 @@ function Editor({ page, site, nav, legal, pages, templates = [], sharedSections 
     } else win?.close();
   };
 
+  // Saves first, so nothing typed is lost, then moves the page and reopens it under its new address.
+  const changeAddress = async (slug: string): Promise<string> => {
+    if (!(await save())) return "Bitte zuerst die Fehler beim Speichern beheben.";
+    try {
+      const response = await fetch(`/api/pages/${encodeURIComponent(page.slug)}/address`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ slug, version: writer.current!.page.version }),
+      });
+      const result = (await response.json().catch(() => ({}))) as Page & { error?: string };
+      if (!response.ok) return result.error ?? "Die Adresse konnte nicht geändert werden.";
+      if (result.slug !== page.slug) location.replace(editPath(result.slug));
+      return "";
+    } catch {
+      return "Keine Verbindung zum Server. Bitte versuche es noch einmal.";
+    }
+  };
+
   const chosenIndex = blocks.findIndex((block) => block.id === selected);
   const chosen = blocks[chosenIndex];
   const chosenShared = chosen?.type === "shared" ? shared.find((item) => item.page.slug === chosen.sectionId) : undefined;
@@ -366,6 +385,7 @@ function Editor({ page, site, nav, legal, pages, templates = [], sharedSections 
           {sharedPage && <p className="theta-notice">Du bearbeitest den gemeinsamen Abschnitt „{meta.title}“. Nach der Veröffentlichung verwenden alle eingebundenen Seiten diese Fassung. Deine gespeicherten Änderungen bleiben bis dahin privat.</p>}
           {error && <div className="theta-error-banner" role="alert"><p>{error}</p>{conflict ? <button className="theta-button" onClick={() => { discarding.current = true; window.location.reload(); }}>Eigene Änderungen verwerfen und Serverstand laden</button> : <button className="theta-button" onClick={() => void save()}>Erneut speichern</button>}</div>}
           <div className="theta-format-dock"><FormatBar /><span>Text direkt auf der Seite bearbeiten</span></div>
+      <LanguageContext.Provider value={site.language ?? "de"}>
       <SiteFrame site={site} nav={nav} legal={legal} current={post ? BLOG : page.slug} linkTo={editPath}>
         {post && (
           <p className="t-post-meta">
@@ -464,6 +484,7 @@ function Editor({ page, site, nav, legal, pages, templates = [], sharedSections 
           <AddMenu custom={customTemplates} sectionOnly={sharedPage} shared={shared} onShared={(item) => addShared(item, blocks.length)} onAdd={(type) => add(type, blocks.length)} onTemplate={(template) => addTemplate(template, blocks.length)} />
         </div>
       </SiteFrame>
+      </LanguageContext.Provider>
         </div>
         <aside className={`theta-sidebar theta-inspector ${side === "inspector" ? "theta-side-open" : ""}`} aria-label="Einstellungen">
           <div className="theta-publication"><h2>Veröffentlichung</h2><strong>{publishedAt ? "Live-Version vorhanden" : "Noch nicht veröffentlicht"}</strong><p>{savedPage.hasChanges || state !== "saved" ? "Änderungen bleiben im Entwurf, bis du sie veröffentlichst." : "Besucher sehen diese Fassung."}</p>
@@ -471,7 +492,7 @@ function Editor({ page, site, nav, legal, pages, templates = [], sharedSections 
             {sharedPage && <><p>Verwendet auf {sharedUsage.length} {sharedUsage.length === 1 ? "Seite" : "Seiten"}:</p><ul>{sharedUsage.map((item) => <li key={item.slug}><a href={item.href}>{item.title}</a></li>)}</ul></>}
             {publishedAt && page.slug !== HOME && <button className="theta-button" disabled={publishing || conflict || (sharedPage && sharedUsage.length > 0)} onClick={() => void save("unpublish")}>Veröffentlichung zurücknehmen</button>}
           </div>
-          {panel === "history" ? <HistoryPanel slug={page.slug} onLoad={loadRevision} /> : panel === "settings" ? <PageSettings page={page} meta={meta} onChange={changeMeta} /> : chosen ? <>
+          {panel === "history" ? <HistoryPanel slug={page.slug} onLoad={loadRevision} /> : panel === "settings" ? <PageSettings page={savedPage} meta={meta} onChange={changeMeta} onAddress={changeAddress} /> : chosen ? <>
             <h2>{blockLabels[chosen.type]}</h2>
             <BlockOptions block={chosen} allowTitle={!sharedPage} onChange={(patch) => update(chosen.id, patch)} />
             <BlockSettings block={chosen} onChange={(patch) => update(chosen.id, patch)} pages={pages} />
@@ -546,9 +567,15 @@ function SharedPreview({ item }: { item?: SharedSectionData }) {
   </div>;
 }
 
-type PageSettingsProps = { page: Page; meta: PageMeta; onChange: (patch: Partial<PageMeta>) => void };
+type PageSettingsProps = {
+  page: Page;
+  meta: PageMeta;
+  onChange: (patch: Partial<PageMeta>) => void;
+  // Gives the page a new address; resolves to an error message, or "" when it worked.
+  onAddress: (slug: string) => Promise<string>;
+};
 
-function PageSettings({ page, meta, onChange }: PageSettingsProps) {
+function PageSettings({ page, meta, onChange, onAddress }: PageSettingsProps) {
   const length = meta.description.length;
   return (
     <div className="theta-panel">
@@ -574,8 +601,66 @@ function PageSettings({ page, meta, onChange }: PageSettingsProps) {
         </small>
       </label>
       {page.kind === "page" && page.slug !== HOME && <label className="theta-check"><input type="checkbox" checked={meta.inNav} onChange={(e) => onChange({ inNav: e.target.checked })} />Im Menü anzeigen (nach Veröffentlichung)</label>}
-      {page.kind !== "section" && <p className="theta-panel-note">Adresse: {pagePath(page)}</p>}
+      {page.kind !== "section" && (page.slug === HOME ? <p className="theta-panel-note">Adresse: /</p> : <AddressField page={page} onAddress={onAddress} />)}
     </div>
+  );
+}
+
+function AddressField({ page, onAddress }: { page: Page; onAddress: (slug: string) => Promise<string> }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(page.slug);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  if (!editing) {
+    return (
+      <p className="theta-panel-note theta-inline">
+        Adresse: {pagePath(page)}
+        <button type="button" className="theta-button" onClick={() => setEditing(true)}>
+          Ändern
+        </button>
+      </p>
+    );
+  }
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError(await onAddress(value));
+    setBusy(false);
+  };
+  const cancel = () => {
+    setEditing(false);
+    setValue(page.slug);
+    setError("");
+  };
+  return (
+    <form className="theta-address" onSubmit={(event) => void submit(event)}>
+      <label>
+        Adresse
+        <span className="theta-address-input">
+          <span aria-hidden="true">{page.kind === "post" ? `/${BLOG}/` : "/"}</span>
+          <input value={value} maxLength={60} required autoFocus onChange={(event) => setValue(event.target.value)} />
+        </span>
+      </label>
+      <small>
+        {page.publishedAt
+          ? "Gilt sofort, auch für die veröffentlichte Fassung. Wer die alte Adresse aufruft, landet automatisch hier."
+          : "Die Seite ist noch nicht veröffentlicht, deshalb braucht die alte Adresse keine Weiterleitung."}{" "}
+        Aus Leerzeichen und Umlauten macht Theta eine gültige Adresse.
+      </small>
+      {error && (
+        <p className="theta-hint" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="theta-inline">
+        <button className="theta-button theta-primary" disabled={busy || !value.trim()}>
+          Übernehmen
+        </button>
+        <button type="button" className="theta-button" onClick={cancel}>
+          Abbrechen
+        </button>
+      </div>
+    </form>
   );
 }
 

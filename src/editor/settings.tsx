@@ -24,6 +24,7 @@ import {
   type PricesBlock,
   type TeamBlock,
   type FormBlock,
+  type MapBlock,
   type TeamMember,
   MAX_HOURS_ROWS,
   MAX_LIST_ITEMS,
@@ -35,6 +36,7 @@ import {
 } from "../blocks";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { videoSource } from "../theme/video";
+import { mapLink, parseLocation } from "../theme/map";
 import { FocalPointPicker } from "./focal-point";
 import { MediaPicker } from "./media-picker";
 
@@ -69,6 +71,8 @@ export function BlockSettings({ block, onChange, pages }: Props<Block>) {
       return <TeamSettings block={block} onChange={change} pages={pages} />;
     case "form":
       return <FormSettings block={block} onChange={change} pages={pages} />;
+    case "map":
+      return <MapSettings block={block} onChange={change} pages={pages} />;
     default:
       return null;
   }
@@ -104,10 +108,10 @@ export function BlockOptions({ block, onChange, allowTitle = true }: { block: Bl
       </select>
     );
   }
-  if (block.type === "image") {
+  if (block.type === "image" || block.type === "map") {
     return (
       <select
-        aria-label="Breite des Bildes"
+        aria-label={block.type === "map" ? "Breite der Karte" : "Breite des Bildes"}
         value={block.width}
         onChange={(e) => onChange({ width: e.target.value as ImageWidth } as Partial<ImageBlock>)}
       >
@@ -491,6 +495,122 @@ function FormSettings({ block, onChange }: Props<FormBlock>) {
       <p className="theta-note">
         Nachrichten landen unter Verwaltung → Nachrichten. Dort kannst du auch eine Weiterleitung per E-Mail einrichten. Besucher können das Formular
         ausfüllen, sobald die Seite veröffentlicht ist.
+      </p>
+    </div>
+  );
+}
+
+type Place = { lat: number; lon: number; name: string };
+
+const zoomLevels: [number, string][] = [
+  [18, "Sehr nah (Hauseingang)"],
+  [16, "Straße"],
+  [14, "Viertel"],
+  [12, "Stadt"],
+];
+
+function MapSettings({ block, onChange }: Props<MapBlock>) {
+  const [query, setQuery] = useState(block.label);
+  const [places, setPlaces] = useState<Place[] | null>(null);
+  const [link, setLink] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const search = async () => {
+    setBusy(true);
+    setMessage("");
+    setPlaces(null);
+    try {
+      const response = await fetch(`/api/geocode?q=${encodeURIComponent(query.trim())}`);
+      const result = (await response.json().catch(() => ({}))) as Place[] | { error?: string };
+      if (!response.ok || !Array.isArray(result)) setMessage(("error" in result && result.error) || "Die Suche hat nicht geklappt.");
+      else if (result.length === 0) setMessage("Nichts gefunden. Versuche es mit Straße, Hausnummer und Ort, oder füge einen Kartenlink ein.");
+      else setPlaces(result);
+    } catch {
+      setMessage("Keine Verbindung zum Server. Bitte versuche es noch einmal.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const choose = (place: Place) => {
+    // What the owner typed usually reads better than OpenStreetMap's long name.
+    onChange({ lat: place.lat, lon: place.lon, label: block.label.trim() || query.trim() || place.name });
+    setPlaces(null);
+  };
+
+  const applyLink = (value: string) => {
+    setLink(value);
+    if (!value.trim()) return setMessage("");
+    const place = parseLocation(value);
+    if (!place) return setMessage("In diesem Link stehen keine Koordinaten. Kopiere den Link aus der Adresszeile der Karte oder nutze die Suche.");
+    onChange({
+      lat: place.lat,
+      lon: place.lon,
+      ...(place.zoom && { zoom: Math.min(Math.max(place.zoom, 12), 18) }),
+      ...(!block.label.trim() && query.trim() && { label: query.trim() }),
+    });
+    setMessage("Ort aus dem Link übernommen.");
+  };
+
+  return (
+    <div className="theta-settings">
+      <form
+        className="theta-settings"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (query.trim().length >= 3) void search();
+        }}
+      >
+        <label>
+          Ort suchen
+          <input value={query} placeholder="Straße Hausnummer, Ort" maxLength={200} onChange={(e) => setQuery(e.target.value)} />
+        </label>
+        <button className="theta-button" disabled={busy || query.trim().length < 3}>
+          {busy ? "Sucht …" : "Suchen"}
+        </button>
+      </form>
+      {places && (
+        <ul className="theta-places">
+          {places.map((place) => (
+            <li key={`${place.lat},${place.lon}`}>
+              <button type="button" className="theta-button" onClick={() => choose(place)}>
+                {place.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <label>
+        Oder Kartenlink einfügen
+        <input value={link} placeholder="Link von OpenStreetMap, Google Maps oder Koordinaten" onChange={(e) => applyLink(e.target.value)} />
+      </label>
+      {message && (
+        <p className="theta-note" role="status">
+          {message}
+        </p>
+      )}
+      <label>
+        Ausschnitt
+        <select value={block.zoom} onChange={(e) => onChange({ zoom: Number(e.target.value) })}>
+          {!zoomLevels.some(([zoom]) => zoom === block.zoom) && <option value={block.zoom}>Aus dem Link (Stufe {block.zoom})</option>}
+          {zoomLevels.map(([zoom, label]) => (
+            <option key={zoom} value={zoom}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
+      {block.lat !== null && block.lon !== null && (
+        <p className="theta-note">
+          Gewählt: {block.lat.toFixed(5)}, {block.lon.toFixed(5)} ·{" "}
+          <a href={mapLink({ lat: block.lat, lon: block.lon }, block.zoom)} target="_blank" rel="noopener">
+            prüfen
+          </a>
+        </p>
+      )}
+      <p className="theta-note">
+        Die Karte lädt erst, wenn Besucher darauf klicken; vorher werden keine Daten an OpenStreetMap übertragen. Die Suche fragt den Ortsdienst von OpenStreetMap.
       </p>
     </div>
   );

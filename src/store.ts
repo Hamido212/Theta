@@ -12,8 +12,10 @@ import {
   ValidationError,
   editPath,
   isSafeImageSrc,
+  pagePath,
   parseBlocks,
 } from "./blocks";
+import { RedirectStore } from "./redirects";
 import { type ThemeSettings, defaultTheme, parseTheme } from "./theme/tokens";
 import { type SavedSectionTemplate, type PageTemplateId, pageBlocks } from "./templates";
 import { validateSection } from "./shared-sections";
@@ -57,7 +59,11 @@ const RESERVED_SLUGS = new Set([
 ]);
 
 export class PageStore {
+  // Old addresses of pages that moved, and redirects added by hand.
+  readonly redirects: RedirectStore;
+
   constructor(private db: Database) {
+    this.redirects = new RedirectStore(db);
     if (!this.get(HOME)) {
       this.insert(HOME, homePage, 0);
       this.publish(HOME, true);
@@ -225,6 +231,38 @@ export class PageStore {
   }
 
   // Saved versions of a page, newest first.
+  // Gives a page or post a new address. If it is public, the old address leads to the new one,
+  // so links and search results keep working.
+  changeSlug(slug: string, input: unknown, version?: number): Page {
+    return this.db.transaction(() => {
+      const page = this.get(slug);
+      if (!page) throw new ValidationError("Seite nicht gefunden");
+      if (slug === HOME) throw new ValidationError("Die Startseite hat immer die Adresse /");
+      if (page.kind === "section") throw new ValidationError("Gemeinsame Abschnitte haben keine eigene Adresse");
+      checkVersion(page, version);
+      const value = String(input ?? "").trim();
+      if (!/[\p{L}\p{N}]/u.test(value)) throw new ValidationError("Die Adresse braucht mindestens einen Buchstaben oder eine Ziffer");
+      const next = slugify(value);
+      if (next === slug) return page;
+      const moved = { ...page, slug: next };
+      if (RESERVED_SLUGS.has(next) || this.db.query("SELECT 1 FROM pages WHERE slug = ?").get(next)) {
+        throw new ValidationError(`Die Adresse ${pagePath(moved)} ist schon vergeben`);
+      }
+      this.db.query("UPDATE pages SET slug = ?, version = version + 1 WHERE slug = ?").run(next, slug);
+      this.db.query("UPDATE revisions SET slug = ? WHERE slug = ?").run(next, slug);
+      // Impressum and Datenschutz stay linked in the footer.
+      const row = this.db.query<{ value: string }, []>("SELECT value FROM settings WHERE key = 'site'").get();
+      const site = row ? (JSON.parse(row.value) as Partial<SiteSettings>) : null;
+      if (site && (site.imprint === slug || site.privacy === slug)) {
+        if (site.imprint === slug) site.imprint = next;
+        if (site.privacy === slug) site.privacy = next;
+        this.db.query("UPDATE settings SET value = ? WHERE key = 'site'").run(JSON.stringify(site));
+      }
+      if (page.publishedAt) this.redirects.moved(pagePath(page), pagePath(moved));
+      return this.get(next)!;
+    })();
+  }
+
   revisions(slug: string): RevisionSummary[] {
     return this.db
       .query<RevisionSummary, [string]>(

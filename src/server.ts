@@ -8,6 +8,7 @@ import { renderBlog, renderDashboard, renderDesign, renderLogin, renderMediaLibr
 import { AuthError, AuthStore, type User } from "./auth";
 import { BLOG, type FormBlock, HOME, type NavItem, type Page, ValidationError, editPath, pagePath, parseBlocks, publicPath } from "./blocks";
 import { ContactStore, RateLimit, parseSubmission } from "./contact";
+import { type Geocoder, nominatim } from "./geocode";
 import { openDatabase } from "./db";
 import { exportSite } from "./export";
 import { MAX_UPLOAD_BYTES, type MediaItem, MediaStore, builtinMedia } from "./media";
@@ -62,11 +63,13 @@ export type AppOptions = {
   publicUrl?: string;
   // Inbox for contact forms. Without it, forms are left out of pages.
   contact?: ContactStore;
+  // Address search for the map block; OpenStreetMap's Nominatim unless replaced (tests).
+  geocoder?: Geocoder;
 };
 
 type Env = { Variables: { user: User } };
 
-export function createApp({ pages, settings, media, auth, setupToken, publicUrl, contact }: AppOptions) {
+export function createApp({ pages, settings, media, auth, setupToken, publicUrl, contact, geocoder = nominatim() }: AppOptions) {
   const app = new Hono<Env>();
 
   const siteContext = (c: Context<Env>): SiteContext => ({
@@ -132,6 +135,17 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl,
 
   // Public site
 
+  // An address without a page: follow a redirect if there is one, otherwise "not found".
+  // Browsers remember permanent redirects, so they are told to check again after an hour.
+  const missing = (c: Context<Env>) => {
+    const target = c.req.method === "GET" || c.req.method === "HEAD" ? pages.redirects.find(new URL(c.req.url).pathname) : null;
+    if (target) {
+      c.header("Cache-Control", "public, max-age=3600");
+      return c.redirect(target, 301);
+    }
+    return c.html(renderNotFound(siteContext(c)), 404);
+  };
+
   // Contact forms post back to the page they are on. ?gesendet=<form> after a redirect shows the thank-you note.
   const formSetup = (c: Context<Env>, path: string, attempt?: FormSetup["attempt"]): FormSetup | undefined => {
     if (!contact) return undefined;
@@ -193,7 +207,7 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl,
   // Drafts are only visible in the editor.
   app.get(`/${BLOG}/:slug{[a-z0-9-]+}`, (c) => {
     const post = pages.post(c.req.param("slug"));
-    return post ? showPage(c, post) : c.html(renderNotFound(siteContext(c)), 404);
+    return post ? showPage(c, post) : missing(c);
   });
   app.post(`/${BLOG}/:slug{[a-z0-9-]+}`, (c) => receiveMessage(c, pages.post(c.req.param("slug"))));
 
@@ -293,6 +307,7 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl,
         error,
         unread: contact?.unread(),
         hasForm: hasLiveForm(c),
+        redirects: pages.redirects.list(),
       }),
       error ? 400 : 200,
     );
@@ -324,6 +339,29 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl,
       if (err instanceof ValidationError || err instanceof ConflictError) return dashboard(c, err.message);
       throw err;
     }
+  });
+
+  // A path is taken when a page or post (published or not) lives there.
+  const pageAt = (path: string) => {
+    if (path === `/${BLOG}`) return true;
+    const [, first, second, extra] = path.split("/");
+    const page = second === undefined ? pages.get(first!) : first === BLOG && extra === undefined ? pages.get(second) : null;
+    return page !== null && page.kind === (second === undefined ? "page" : "post");
+  };
+  app.post("/admin/redirects", async (c) => {
+    try {
+      const form = await c.req.parseBody();
+      pages.redirects.add({ from: form.from, to: form.to }, pageAt);
+      return c.redirect("/admin#weiterleitungen", 303);
+    } catch (err) {
+      if (err instanceof ValidationError) return dashboard(c, err.message);
+      throw err;
+    }
+  });
+  app.post("/admin/redirects/delete", async (c) => {
+    const form = await c.req.parseBody();
+    pages.redirects.remove(String(form.from ?? ""));
+    return c.redirect("/admin#weiterleitungen", 303);
   });
 
   // Blog
@@ -667,6 +705,31 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl,
     }
   });
 
+  // Address search for the map block in the editor.
+  app.get("/api/geocode", async (c) => {
+    const query = (c.req.query("q") ?? "").trim();
+    if (query.length < 3 || query.length > 200) return c.json({ error: "Bitte eine Adresse mit mindestens drei Zeichen eingeben" }, 400);
+    try {
+      return c.json(await geocoder(query, settings.site().language ?? "de"));
+    } catch (err) {
+      console.error("Ortssuche fehlgeschlagen:", err instanceof Error ? err.message : err);
+      return c.json({ error: "Die Suche bei OpenStreetMap hat gerade nicht geklappt. Du kannst stattdessen einen Kartenlink einfügen." }, 502);
+    }
+  });
+
+  // A new address for a page or post. The old one keeps working as a redirect once the page is public.
+  app.post("/api/pages/:slug/address", async (c) => {
+    const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
+    if (!body || typeof body !== "object" || Array.isArray(body)) return c.json({ error: "Ungültiges JSON" }, 400);
+    try {
+      return c.json(pages.changeSlug(c.req.param("slug"), body.slug, parseVersion(body.version)));
+    } catch (err) {
+      if (err instanceof ConflictError) return c.json({ error: err.message, conflict: true }, 409);
+      if (err instanceof ValidationError) return c.json({ error: err.message }, 400);
+      throw err;
+    }
+  });
+
   // Static files
 
   app.get("/assets/theme.css", (c) => c.body(asset("./theme/theme.css").stream(), 200, css));
@@ -696,14 +759,14 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl,
   app.get("/:slug{[a-z0-9-]+}", (c) => {
     const page = pages.live(c.req.param("slug"));
     // Posts live under /blog only.
-    return page?.kind === "page" ? showPage(c, page) : c.html(renderNotFound(siteContext(c)), 404);
+    return page?.kind === "page" ? showPage(c, page) : missing(c);
   });
   app.post("/:slug{[a-z0-9-]+}", (c) => {
     const page = pages.live(c.req.param("slug"));
     return receiveMessage(c, page?.kind === "page" ? page : null);
   });
 
-  app.notFound((c) => c.html(renderNotFound(siteContext(c)), 404));
+  app.notFound((c) => missing(c));
 
   return app;
 }

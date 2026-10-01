@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { BLOG, HOME } from "./blocks";
 import { builtinMedia, type MediaStore } from "./media";
 import { type SiteContext, renderBlogIndex, renderFeed, renderNotFound, renderPage, renderRobots, renderSitemap } from "./render";
+import type { Redirect } from "./redirects";
 import type { PageStore, SettingsStore } from "./store";
 import { FONTS, fontFiles, themeCss } from "./theme/tokens";
 
@@ -53,8 +54,39 @@ export async function exportSite({ pages, settings, media }: Stores, origin: str
     const path = second ? media.path(first!, second) : builtinMedia(first!);
     if (path && !files.has(url.slice(1))) files.set(url.slice(1), await Bun.file(path).bytes());
   }
+  addRedirects(files, pages.redirects.list(), origin);
   return files;
 }
+
+// Static hosts cannot answer with a real redirect by themselves. Many (Netlify, Cloudflare Pages)
+// read a _redirects file; everywhere else a small page at the old address forwards the visitor.
+function addRedirects(files: Map<string, Uint8Array>, redirects: Redirect[], origin: string) {
+  if (redirects.length === 0) return;
+  const encoder = new TextEncoder();
+  files.set("_redirects", encoder.encode(redirects.map(({ from, to }) => `${from} ${to} 301`).join("\n") + "\n"));
+  for (const { from, to } of redirects) {
+    let path: string;
+    try {
+      path = decodeURIComponent(from.slice(1));
+    } catch {
+      continue;
+    }
+    if (path.split("/").some((part) => part === "" || part === "." || part === "..")) continue;
+    const file = /\.html?$/.test(path) ? path : `${path}/index.html`;
+    if (files.has(file)) continue;
+    const target = escapeHtml(new URL(to, origin).href);
+    files.set(
+      file,
+      encoder.encode(
+        `<!doctype html><html><head><meta charset="utf-8"><title>Weitergeleitet</title><meta name="robots" content="noindex">` +
+          `<link rel="canonical" href="${target}"><meta http-equiv="refresh" content="0; url=${target}"></head>` +
+          `<body><p><a href="${target}">${target}</a></p></body></html>\n`,
+      ),
+    );
+  }
+}
+
+const escapeHtml = (value: string) => value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 export async function writeFiles(files: Map<string, Uint8Array>, dir: string) {
   for (const [path, data] of files) {
