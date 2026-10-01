@@ -12,7 +12,9 @@
     "theta": "bun src/cli.ts",
     "demo:seid": "bun examples/seid/run.ts",
     "demo:seid:export": "bun examples/seid/run.ts --export",
-    "build": "bun scripts/build.ts"
+    "build": "bun scripts/build.ts",
+    "demo:website": "bun examples/website/run.ts",
+    "demo:website:export": "bun examples/website/run.ts --export"
   },
   "dependencies": {
     "fflate": "^0.8.2",

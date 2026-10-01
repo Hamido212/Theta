@@ -968,6 +968,7 @@ div.t-faq-item .t-faq-question {
 .t-band-spacing-compact { padding-block: var(--t-space); }
 .t-band-spacing-spacious { padding-block: calc(var(--t-space) * 4); }
 .t-band-align-center { text-align: center; }
-.t-band-align-center .t-button-row { justify-content: center; }
+.t-band-align-center .t-button-row,
+.t-band-align-center .t-buttons { justify-content: center; }
 .t-band .t-hero { width: 100%; margin-inline: 0; padding-inline: 0; }
 .t-band .t-width-wide, .t-band .t-width-full { max-width: 100%; margin-inline: 0; }

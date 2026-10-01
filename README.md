@@ -2,6 +2,18 @@
 
 Ein einfaches, modernes CMS. Für alle, die eine Website pflegen wollen, ohne programmieren zu können, und für Entwickler, die es erweitern.
 
+**Hugo und Astro sind für Leute, die Websites bauen. Theta ist für Leute, die ihre Website selbst pflegen.**
+
+| | Hugo | Astro | Theta |
+|---|---|---|---|
+| Texte ändern | Datei bearbeiten, neu bauen | Code oder Datei bearbeiten, neu bauen | Auf der Seite klicken und tippen |
+| Design | Theme programmieren | Komponenten programmieren | Vorlage wählen, Regler einstellen |
+| JavaScript für Besucher | keins | keins, außer gewollt | keins |
+| Kontaktformular, Karte, Blog | selbst bauen oder Fremddienst | selbst bauen oder Fremddienst | eingebaut, ohne Fremddienste |
+| Installation | Programm und Terminal | Node und Terminal | Herunterladen und doppelklicken |
+
+Noch nicht enthalten sind Plugins und mehrsprachige Seiten. Wer Tausende Seiten aus Dateien erzeugt und gerne mit Git arbeitet, ist mit Hugo oder Astro gut bedient. Die [Theta-Website](examples/website/README.md) ist selbst mit Theta gebaut und erklärt den Unterschied ausführlicher.
+
 ![Der Theta-Editor mit Seitennavigation und Bild-Einstellungen](docs/editor-workbench.jpg)
 
 ## Ausprobieren
