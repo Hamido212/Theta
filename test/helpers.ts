@@ -1,4 +1,5 @@
 import { AuthStore } from "../src/auth";
+import { ContactStore, type Mailer } from "../src/contact";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -9,6 +10,17 @@ import { PageStore, SettingsStore } from "../src/store";
 
 export const SETUP_TOKEN = "test-setup-token";
 
+// Collects e-mails instead of sending them. Set fail to make sending throw.
+export function fakeMailer() {
+  const sent: Parameters<Mailer>[] = [];
+  const control = { fail: false };
+  const mailer: Mailer = async (...args) => {
+    if (control.fail) throw new Error("Verbindung abgelehnt");
+    sent.push(args);
+  };
+  return { mailer, sent, control };
+}
+
 // A fresh in-memory site. With login: true it also has an account and a session cookie.
 export async function testSite({ login = false } = {}) {
   const db = openDatabase(":memory:");
@@ -17,15 +29,17 @@ export async function testSite({ login = false } = {}) {
   const settings = new SettingsStore(db);
   const uploads = mkdtempSync(join(tmpdir(), "theta-uploads-"));
   const media = new MediaStore(db, uploads);
+  const mail = fakeMailer();
+  const contact = new ContactStore(db, mail.mailer);
   let cookie = "";
   if (login) {
     const user = await auth.createUser({ email: "test@example.com", name: "Test", password: "richtig-geheim" });
     cookie = `theta_session=${auth.createSession(user.id).token}`;
   }
-  const app = createApp({ pages, settings, media, auth, setupToken: SETUP_TOKEN });
+  const app = createApp({ pages, settings, media, auth, contact, setupToken: SETUP_TOKEN });
   const request = (path: string, init: RequestInit = {}) =>
     app.request(path, { ...init, headers: { cookie, ...init.headers } });
-  return { app, auth, pages, settings, media, uploads, db, request };
+  return { app, auth, pages, settings, media, uploads, db, request, contact, mail };
 }
 
 export const form = (fields: Record<string, string>) => ({

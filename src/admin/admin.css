@@ -126,7 +126,8 @@ h1 {
 
 .a-tabs {
   display: flex;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
   margin-right: auto;
 }
 
@@ -488,4 +489,42 @@ select {
   .a-pair {
     grid-template-columns: 1fr;
   }
+}
+
+.a-notice {
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--a-accent) 12%, transparent);
+}
+
+.a-messages li {
+  align-items: flex-start;
+}
+
+/* The message gets the full width; its actions follow underneath. */
+.a-messages .a-grow {
+  flex-basis: 100%;
+}
+
+.a-mail-actions {
+  margin-top: 0.75rem;
+}
+
+.a-messages a[href^="tel:"] {
+  white-space: nowrap;
+}
+
+.a-messages p {
+  margin: 0 0 0.25rem;
+}
+
+.a-unread {
+  box-shadow: inset 3px 0 0 var(--a-accent);
+  padding-left: 0.75rem !important;
+}
+
+.a-message-text {
+  margin-top: 0.5rem !important;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }

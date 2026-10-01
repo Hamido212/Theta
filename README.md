@@ -51,9 +51,10 @@ Start, Bearbeitung, Export und Unterschiede zum Original sind in [examples/seid/
 - **Barrierefreiheit im Blick.** Fehlt einem Bild die Beschreibung, weist der Editor darauf hin.
 - **Fußzeile und Logo.** Unter `/admin` lädst du ein Logo aus der Mediathek (es erscheint oben und als Symbol im Browser-Tab), schreibst einen Text für die Fußzeile, etwa Adresse, Öffnungszeiten und Links, und wählst die Seiten für Impressum und Datenschutz. Die stehen dann unten auf jeder Seite statt im Hauptmenü.
 - **Gefunden werden.** Jede Seite hat Titel und Beschreibung für Suchmaschinen, eine kanonische Adresse und Vorschau-Daten für geteilte Links. `sitemap.xml` und `robots.txt` erzeugt Theta automatisch.
+- **Kontaktformular ohne fremde Dienste.** Der Block „Kontaktformular“ fragt Name, E-Mail, Nachricht und auf Wunsch die Telefonnummer ab. Jede Nachricht landet unter `/admin/messages` im Postfach der Verwaltung; die Startseite der Verwaltung zeigt, wenn neue da sind. Trägst du dort zusätzlich den Postausgangsserver (SMTP) deines E-Mail-Anbieters ein, kommt jede Nachricht auch per E-Mail, und du antwortest direkt aus deinem Mailprogramm. Das Passwort liegt dafür in der Datenbank und wird nach dem Speichern nie wieder angezeigt; nimm am besten ein eigenes App-Passwort, falls dein Anbieter das anbietet. Gegen Spam helfen ein unsichtbares Fangfeld, eine Mindestzeit zum Ausfüllen, ein signierter Zeitstempel und ein Limit von fünf Nachrichten pro Besucher in zehn Minuten, alles ohne Captcha und ohne JavaScript. Ein Hinweis unter dem Formular verlinkt die gewählte Datenschutzseite. Weil Nachrichten den Theta-Server brauchen, fehlen Formulare im statischen Export.
 - **Blog eingebaut.** Unter `/admin/blog` legst du Beiträge an und schreibst sie im selben Editor wie Seiten. Neue Beiträge bleiben Entwürfe, bis du sie veröffentlichst. Dann erscheinen sie mit Datum unter `/blog`, „Blog“ taucht im Menü auf, und Leser können über `/blog/feed.xml` (RSS) folgen. Der Blog ist auch im statischen Export enthalten.
 
-Blöcke: Überschrift, Text, Bild, Galerie, Button, Spalten, Video, Zitat, Trenner, Preisliste, Fragen & Antworten, Öffnungszeiten und Team. Überschriften gibt es in drei Größen (Seitentitel, Überschrift, kleine Überschrift), die auch für Suchmaschinen und Screenreader richtig gegliedert sind. Bilder können eine Bildunterschrift haben und in Textbreite, breit oder über die ganze Fensterbreite stehen. Buttons, die direkt aufeinander folgen, stehen nebeneinander in einer Reihe. Spalten gibt es als reinen Text oder als Karten mit Bild und optionalem Link („Mehr erfahren →“). Galerien zeigen zwei, drei oder vier Bilder pro Reihe, quadratisch zugeschnitten oder im Originalformat. Die **Preisliste** stellt Name und Preis mit gepunkteter Linie nebeneinander, ideal für Speisekarten und Leistungen. **Fragen & Antworten** klappen per Klick auf, ganz ohne JavaScript. **Öffnungszeiten** erscheinen als übersichtliche Tabelle mit Hinweiszeile, das **Team** als Raster mit runden Fotos, Name und Aufgabe. Leere Einträge bleiben auf der fertigen Seite unsichtbar.
+Blöcke: Überschrift, Text, Bild, Galerie, Button, Spalten, Video, Zitat, Trenner, Preisliste, Fragen & Antworten, Öffnungszeiten, Team und Kontaktformular. Überschriften gibt es in drei Größen (Seitentitel, Überschrift, kleine Überschrift), die auch für Suchmaschinen und Screenreader richtig gegliedert sind. Bilder können eine Bildunterschrift haben und in Textbreite, breit oder über die ganze Fensterbreite stehen. Buttons, die direkt aufeinander folgen, stehen nebeneinander in einer Reihe. Spalten gibt es als reinen Text oder als Karten mit Bild und optionalem Link („Mehr erfahren →“). Galerien zeigen zwei, drei oder vier Bilder pro Reihe, quadratisch zugeschnitten oder im Originalformat. Die **Preisliste** stellt Name und Preis mit gepunkteter Linie nebeneinander, ideal für Speisekarten und Leistungen. **Fragen & Antworten** klappen per Klick auf, ganz ohne JavaScript. **Öffnungszeiten** erscheinen als übersichtliche Tabelle mit Hinweiszeile, das **Team** als Raster mit runden Fotos, Name und Aufgabe. Leere Einträge bleiben auf der fertigen Seite unsichtbar.
 
 Für moderne Seiten gibt es zwei Bausteine über die volle Fensterbreite. Das **Titelbild** zeigt ein großes Foto mit Seitentitel, einem Satz und bis zu zwei Buttons darüber; das Foto wird automatisch abgedunkelt, damit die Schrift lesbar bleibt, und ohne Foto erscheint der Bereich in der Akzentfarbe. Ein **Abschnitt** beginnt einen neuen Bereich mit eigenem Hintergrund (normal, getönt, Akzentfarbe oder Kontrast), der bis zum nächsten Abschnitt reicht. Die Farben kommen aus dem Design, Texte und Buttons passen sich darin von selbst an. Videos von YouTube oder Vimeo laden erst, wenn jemand auf Abspielen klickt; vorher werden keine Daten an die Plattform übertragen.
 
@@ -69,9 +70,10 @@ Das Titelbild hat außerdem die Darstellung **Profil mit Porträt** mit Kurzbeze
 | `src/store.ts` | Speicherung der Seiten, Blog-Beiträge und Einstellungen |
 | `src/shared-sections.ts` | Prüfung gemeinsamer Abschnitte und Auflösung ihrer veröffentlichten Einbindungen |
 | `src/auth.ts` | Konten, Passwörter und Anmeldungen |
+| `src/contact.ts` | Nachrichten aus Kontaktformularen, Spamschutz und E-Mail-Versand per SMTP |
 | `src/media.ts` | Hochgeladene Bilder: Prüfung, Optimierung, kleinere Versionen |
 | `src/export.ts`, `src/zip.ts` | Export der Website als statische Dateien bzw. ZIP |
-| `src/admin/` | Verwaltung (Seiten, Blog, Mediathek, Design), Anmelde- und Einrichtungsseiten |
+| `src/admin/` | Verwaltung (Seiten, Blog, Mediathek, Nachrichten, Design), Anmelde- und Einrichtungsseiten |
 | `src/theme/` | Das Theme: Kopfzeile mit Menü, Block-Komponenten, CSS und Design-Tokens (`tokens.ts`) |
 | `src/render.tsx` | Rendert öffentliche Seiten, Blog, RSS-Feed, Sitemap und die Editor-Seite auf dem Server |
 | `src/editor/` | Der Editor im Browser (React) |
@@ -87,7 +89,7 @@ Theme-Komponenten laufen an beiden Stellen: auf dem Server für die öffentliche
 | `THETA_HOST` | `127.0.0.1` | Adresse, auf der der Server lauscht |
 | `THETA_DB` | `theta.db` | Pfad zur SQLite-Datei |
 | `THETA_UPLOADS` | `uploads` neben der Datenbank | Ordner für hochgeladene Bilder |
-| `THETA_URL` | | Öffentliche Adresse, z. B. `https://meine-seite.de`, wenn Theta hinter einem Proxy läuft |
+| `THETA_URL` | | Öffentliche Adresse, z. B. `https://meine-seite.de`, wenn Theta hinter einem Proxy läuft. Das Limit des Kontaktformulars zählt dann pro Adresse, die der Proxy in `X-Forwarded-For` anhängt |
 
 ## Noch nicht enthalten
 

@@ -5,6 +5,7 @@ import { BLOG, HOME, type NavItem, type Page, type SiteSettings, excerpt, format
 import { BlockFlow, BlockView } from "./theme/blocks";
 import { type ImageLookup, Img, ImageLookupContext } from "./theme/image";
 import { SiteFrame } from "./theme/layout";
+import { FormContext, type FormSetup } from "./theme/form";
 import { expandSharedSections, type SharedSectionData, type SharedSections } from "./shared-sections";
 
 // What every page needs to know about the site around it.
@@ -105,8 +106,9 @@ function PostDate({ page, language }: { page: Page; language?: "de" | "en" }) {
   );
 }
 
-// Public page: plain HTML and CSS, no JavaScript at all.
-export function renderPage(page: Page, { site, nav, legal = [], origin, images = () => null, themeCss, sharedSections }: SiteContext): string {
+// Public page: plain HTML and CSS, no JavaScript at all. Contact forms only appear with
+// form, which the live server passes; the static export has nobody to receive them.
+export function renderPage(page: Page, { site, nav, legal = [], origin, images = () => null, themeCss, sharedSections }: SiteContext, form?: FormSetup): string {
   page = { ...page, blocks: expandSharedSections(page.blocks, sharedSections) };
   const post = page.kind === "post";
   return html(
@@ -125,7 +127,9 @@ export function renderPage(page: Page, { site, nav, legal = [], origin, images =
       <ImageLookupContext.Provider value={images}>
         <SiteFrame site={site} nav={nav} legal={legal} current={post ? BLOG : page.slug} linkTo={publicPath}>
           {post && <PostDate page={page} language={site.language} />}
-          <BlockFlow blocks={page.blocks}>{(block) => <BlockView key={block.id} block={block} />}</BlockFlow>
+          <FormContext.Provider value={form ?? null}>
+            <BlockFlow blocks={page.blocks}>{(block) => <BlockView key={block.id} block={block} />}</BlockFlow>
+          </FormContext.Provider>
           {post && (
             <p className="t-post-back">
               <a href={`/${BLOG}`}>{site.language === "en" ? "← All posts" : "← Alle Beiträge"}</a>

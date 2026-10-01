@@ -64,6 +64,18 @@ const migrations: string[] = [
    CREATE TABLE section_templates (
      id TEXT PRIMARY KEY, title TEXT NOT NULL, blocks TEXT NOT NULL, created_at TEXT NOT NULL
    )`,
+  `CREATE TABLE messages (
+     id         INTEGER PRIMARY KEY,
+     page       TEXT NOT NULL,
+     page_title TEXT NOT NULL,
+     name       TEXT NOT NULL,
+     email      TEXT NOT NULL,
+     phone      TEXT NOT NULL,
+     message    TEXT NOT NULL,
+     created_at TEXT NOT NULL,
+     read_at    TEXT,
+     mail       TEXT NOT NULL
+   )`,
 ];
 
 export function openDatabase(path: string): Database {

@@ -2,6 +2,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { Database } from "bun:sqlite";
 import { AuthStore } from "../../src/auth";
+import { ContactStore } from "../../src/contact";
 import { openDatabase } from "../../src/db";
 import { exportSite, writeFiles } from "../../src/export";
 import { MediaStore } from "../../src/media";
@@ -36,7 +37,7 @@ if (Bun.argv.includes("--export")) {
 } else {
   const auth = new AuthStore(db);
   const setupToken = auth.hasUsers() ? undefined : Buffer.from(crypto.getRandomValues(new Uint8Array(24))).toString("base64url");
-  const server = Bun.serve({ hostname: "127.0.0.1", port: Number(process.env.THETA_DEMO_PORT ?? 3108), fetch: createApp({ ...stores, auth, setupToken }).fetch });
+  const server = Bun.serve({ hostname: "127.0.0.1", port: Number(process.env.THETA_DEMO_PORT ?? 3108), fetch: createApp({ ...stores, auth, setupToken, contact: new ContactStore(db) }).fetch });
   console.log(`seid.dev in Theta: ${server.url}`);
   console.log(`Bearbeiten: ${new URL("/edit", server.url)}`);
   if (setupToken) console.log(`Eigenes Konto einrichten: ${new URL(`/setup?token=${setupToken}`, server.url)}`);

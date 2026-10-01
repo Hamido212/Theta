@@ -23,6 +23,7 @@ import {
   type HoursBlock,
   type PricesBlock,
   type TeamBlock,
+  type FormBlock,
   type TeamMember,
   MAX_HOURS_ROWS,
   MAX_LIST_ITEMS,
@@ -66,6 +67,8 @@ export function BlockSettings({ block, onChange, pages }: Props<Block>) {
       return <HoursSettings block={block} onChange={change} pages={pages} />;
     case "team":
       return <TeamSettings block={block} onChange={change} pages={pages} />;
+    case "form":
+      return <FormSettings block={block} onChange={change} pages={pages} />;
     default:
       return null;
   }
@@ -472,4 +475,23 @@ function SectionSettings({ block, onChange }: Props<SectionBlock>) {
     </select></label>
     <p className="theta-note">Verschieben, Verdoppeln und Löschen wirken auf den ganzen Abschnitt bis zum nächsten Abschnitt.</p>
   </div>;
+}
+
+function FormSettings({ block, onChange }: Props<FormBlock>) {
+  return (
+    <div className="theta-settings">
+      <label className="theta-check">
+        <input type="checkbox" checked={block.phone} onChange={(e) => onChange({ phone: e.target.checked })} />
+        Feld für eine Telefonnummer (optional für Besucher)
+      </label>
+      <label>
+        Bestätigung nach dem Absenden
+        <textarea value={block.success} maxLength={500} rows={2} onChange={(e) => onChange({ success: e.target.value })} />
+      </label>
+      <p className="theta-note">
+        Nachrichten landen unter Verwaltung → Nachrichten. Dort kannst du auch eine Weiterleitung per E-Mail einrichten. Besucher können das Formular
+        ausfüllen, sobald die Seite veröffentlicht ist.
+      </p>
+    </div>
+  );
 }

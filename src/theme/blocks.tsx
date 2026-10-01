@@ -21,6 +21,7 @@ import { TextField } from "./fields";
 import { Img } from "./image";
 import { videoPlaceholder, videoSource } from "./video";
 import { SocialIcon } from "./icons";
+import { ContactForm } from "./form";
 
 // The default theme. Every block component renders on the server (edit is undefined)
 // and inside the editor (edit updates the block), so both views look identical.
@@ -486,5 +487,7 @@ export function BlockView({ block, edit }: BlockProps<Block>) {
       return <Hours block={block} edit={e} />;
     case "team":
       return <Team block={block} edit={e} />;
+    case "form":
+      return <ContactForm block={block} edit={e} />;
   }
 }

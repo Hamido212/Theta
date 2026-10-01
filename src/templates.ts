@@ -12,8 +12,8 @@ const heading = (text: string, level: 1 | 2 | 3 = 2): Draft => ({ type: "heading
 const text = (): Draft => ({ type: "text", text: "" });
 const section = (background: SectionBackground): Draft => ({ type: "section", background });
 const button = (label: string): Draft => ({ type: "button", label, href: "", variant: "primary" });
-// Address and phone as text, then the opening hours.
-const contactDetails = (): Draft[] => [text(), heading("Öffnungszeiten", 3), strip(newBlock("hours")), button("E-Mail schreiben")];
+// Address and phone as text, the opening hours, then a form for messages.
+const contactDetails = (): Draft[] => [text(), heading("Öffnungszeiten", 3), strip(newBlock("hours")), heading("Schreib uns", 3), strip(newBlock("form"))];
 const strip = <T extends Block>(block: T): Draft => {
   const { id: _, ...rest } = block;
   return rest as Draft;
@@ -70,7 +70,7 @@ const sections = {
   },
   contact: {
     label: "Kontakt",
-    hint: "Adresse, Öffnungszeiten und ein Button",
+    hint: "Adresse, Öffnungszeiten und ein Kontaktformular",
     drafts: () => [
       section("soft"),
       heading("Kontakt"),
@@ -182,7 +182,7 @@ const pages = {
   },
   "agency-contact": {
     label: "Agentur · Kontakt",
-    drafts: (title: string) => [heading(title, 1), text(), button("E-Mail schreiben"), agencySection("soft"), heading("Ein paar Zeilen reichen."), agencyColumns(["Dein Vorhaben", "Dein Zeitplan", "Dein Rahmen"], "plain")],
+    drafts: (title: string) => [heading(title, 1), text(), strip(newBlock("form")), agencySection("soft"), heading("Ein paar Zeilen reichen."), agencyColumns(["Dein Vorhaben", "Dein Zeitplan", "Dein Rahmen"], "plain")],
   },
 } satisfies Record<string, { label: string; drafts: (title: string) => Draft[] }>;
 
