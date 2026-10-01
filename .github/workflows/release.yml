@@ -32,8 +32,9 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
       - run: bun run build
-      # The program must start (which loads the image library) and serve the editor. Its test
-      # data stays outside dist/theta, so the download does not ship a database.
+      # The program must start (which loads the image library), serve the editor and run its
+      # maintenance commands. Its test data stays outside dist/theta, so the download does not
+      # ship a database.
       - name: Smoke test
         run: |
           THETA_OPEN=0 PORT=3999 THETA_DB="$RUNNER_TEMP/theta-smoke/theta.db" ./dist/theta/${{ matrix.exe }} > theta.log 2>&1 &
@@ -42,6 +43,10 @@ jobs:
           curl -sf http://127.0.0.1:3999/ >/dev/null
           curl -sf http://127.0.0.1:3999/assets/editor.js >/dev/null
           kill "$program" || true
+          THETA_DB="$RUNNER_TEMP/theta-smoke/theta.db" ./dist/theta/${{ matrix.exe }} hilfe > "$RUNNER_TEMP/theta-hilfe.txt"
+          grep -q reset-password "$RUNNER_TEMP/theta-hilfe.txt"
+          THETA_DB="$RUNNER_TEMP/theta-smoke/theta.db" ./dist/theta/${{ matrix.exe }} backup "$RUNNER_TEMP/theta-smoke.zip"
+          test -s "$RUNNER_TEMP/theta-smoke.zip"
           test ! -e dist/theta/theta-daten
       - name: Package
         run: |

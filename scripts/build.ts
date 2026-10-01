@@ -82,23 +82,47 @@ if (!target) {
 }
 
 cpSync(join(root, "LICENSE"), join(out, "LICENSE.txt"));
-writeFileSync(
-  join(out, "LIESMICH.txt"),
-  `Theta
+// The guide next to the program, for the system it runs on.
+const platform = target ? (target.includes("windows") ? "win32" : target.includes("darwin") ? "darwin" : "linux") : process.platform;
+const start = {
+  win32: `Starten: Doppelklick auf "theta.exe". Der Browser öffnet sich mit der Einrichtung.
+Ein Fenster zeigt, dass Theta läuft. Lass es offen, solange du an deiner Website arbeitest.
+
+Weil Theta noch nicht signiert ist, warnt Windows beim ersten Start mit SmartScreen.
+Klicke dann auf "Weitere Informationen" und "Trotzdem ausführen".`,
+  darwin: `Starten: Doppelklick auf "theta". Ein Terminal-Fenster zeigt, dass Theta läuft, und der
+Browser öffnet sich mit der Einrichtung. Lass das Fenster offen, solange du an deiner Website arbeitest.
+
+Weil Theta noch nicht bei Apple signiert ist, blockiert macOS den ersten Start. Am einfachsten
+gibst du den Ordner einmal ganz frei: Öffne das Programm "Terminal", tippe
+  xattr -dr com.apple.quarantine
+mit einem Leerzeichen am Ende, ziehe diesen Ordner ins Terminal-Fenster und drücke Enter.
+Ohne Terminal: Nach dem blockierten Start unter Systemeinstellungen > Datenschutz & Sicherheit
+bei "theta" auf "Trotzdem öffnen" klicken. Meldet macOS danach eine Datei aus "node_modules",
+gibst du sie dort genauso frei und startest Theta noch einmal.`,
+  linux: `Starten: Öffne in diesem Ordner ein Terminal und gib ./theta ein. Der Browser öffnet sich
+mit der Einrichtung, die Adresse steht auch im Terminal. Lass das Terminal offen, solange du
+an deiner Website arbeitest. Theta braucht glibc 2.28 oder neuer (etwa Ubuntu ab 20.04 oder Debian ab 10).`,
+}[platform === "win32" || platform === "darwin" ? platform : "linux"];
+const command = platform === "win32" ? "theta.exe" : "./theta";
+const terminal = platform === "win32" ? "Tippe in diesem Ordner oben in die Adresszeile cmd, drücke Enter und gib ein"
+  : "Öffne in diesem Ordner ein Terminal und gib ein";
+const guide = `Theta
 =====
 
-Starten: Doppelklick auf "${name}". Der Browser öffnet sich mit der Einrichtung.
-Ein Fenster zeigt, dass Theta läuft. Lass es offen, solange du an deiner Website arbeitest.
+${start}
 
 Deine Daten liegen im Ordner "theta-daten" neben dem Programm. Unter "Übersicht" in der
 Verwaltung lädst du jederzeit eine Sicherung herunter, mit der du auf einen anderen Rechner
 umziehen kannst.
 
+Passwort vergessen? ${terminal}:
+  ${command} reset-password deine@adresse.de
+Theta zeigt dann ein neues Passwort an. Alle Befehle zeigt "${command} hilfe".
+
 Den Ordner "node_modules" braucht Theta für Bilder. Bitte nicht löschen.
 Theta steht unter der MIT-Lizenz, siehe LICENSE.txt.
-
-macOS: Beim ersten Start mit Rechtsklick auf "theta" und "Öffnen" bestätigen.
-Windows: Erscheint ein Hinweis von SmartScreen, auf "Weitere Informationen" und "Trotzdem ausführen" klicken.
-`,
-);
+`;
+// Windows editors expect CRLF line endings.
+writeFileSync(join(out, "LIESMICH.txt"), platform === "win32" ? guide.replaceAll("\n", "\r\n") : guide);
 console.log(`Fertig: ${relative(root, out)}`);

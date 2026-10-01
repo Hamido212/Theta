@@ -86,6 +86,8 @@ export const migrations: string[] = [
 
 export function openDatabase(path: string): Database {
   const db = new Database(path, { create: true, strict: true });
+  // A maintenance command may write while the server runs; wait for its lock instead of failing.
+  db.run("PRAGMA busy_timeout = 5000");
   db.run("PRAGMA journal_mode = WAL");
   db.run("PRAGMA foreign_keys = ON");
 
