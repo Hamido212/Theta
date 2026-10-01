@@ -6,3 +6,5 @@ uploads/
 .DS_Store
 examples/seid/export/
 examples/seid/data/
+build/
+dist/

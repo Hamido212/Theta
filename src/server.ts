@@ -5,6 +5,7 @@ import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { bodyLimit } from "hono/body-limit";
 import { csrf } from "hono/csrf";
 import { renderBlog, renderDashboard, renderDesign, renderLogin, renderMediaLibrary, renderMessages, renderSetup, renderSetupLocked, renderTrash, renderSharedSections } from "./admin/pages";
+import { assetFile, isCompiled } from "./assets";
 import { AuthError, AuthStore, type User } from "./auth";
 import { BackupError, Backups, MAX_BACKUP_BYTES, backupName } from "./backup";
 import { BLOG, type FormBlock, HOME, type NavItem, type Page, ValidationError, editPath, pagePath, parseBlocks, publicPath } from "./blocks";
@@ -32,9 +33,10 @@ import { expandSharedSections } from "./shared-sections";
 
 const SESSION_COOKIE = "theta_session";
 
-// Bundles the browser editor once, on first request.
+// Bundles the browser editor once, on first request. The single-file program brings it prebuilt.
 let editorBundle: Promise<string> | undefined;
 function buildEditor(): Promise<string> {
+  if (isCompiled()) return (editorBundle ??= assetFile("build/editor.js").text());
   editorBundle ??= Bun.build({
     entrypoints: [join(import.meta.dir, "editor", "main.tsx")],
     target: "browser",
@@ -50,7 +52,7 @@ function buildEditor(): Promise<string> {
   return editorBundle;
 }
 
-const asset = (path: string) => Bun.file(new URL(path, import.meta.url));
+const asset = (path: string) => assetFile(`src/${path.replace(/^\.\//, "")}`);
 const css = { "content-type": "text/css; charset=utf-8" };
 
 export type AppOptions = {
@@ -845,7 +847,9 @@ function safeEqual(a: string, b: string): boolean {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
-if (import.meta.main) {
+// Starts Theta with the settings from the environment. Returns the address to open first:
+// the setup link while there is no account, otherwise the admin.
+export function startServer(): URL {
   const dbPath = process.env.THETA_DB ?? "theta.db";
   const db = openDatabase(dbPath);
   const uploads = process.env.THETA_UPLOADS ?? join(dirname(dbPath), "uploads");
@@ -862,11 +866,18 @@ if (import.meta.main) {
     fetch: createApp({ pages: new PageStore(db), settings: new SettingsStore(db), media, auth, setupToken, publicUrl, contact: new ContactStore(db), backups }).fetch,
   });
 
-  const base = publicUrl ?? server.url;
+  // Listening on all addresses (e.g. in Docker), the server's own address is 0.0.0.0, which
+  // browsers cannot open; localhost reaches it from the same computer.
+  const base = publicUrl ?? server.url.href.replace("//0.0.0.0", "//localhost");
   console.log(`Theta läuft auf ${base}`);
   if (setupToken) {
-    console.log(`\nNoch kein Konto vorhanden. Richte Theta hier ein:\n${new URL(`/setup?token=${setupToken}`, base)}\n`);
-  } else {
-    console.log(`Verwalten: ${new URL("/admin", base)}`);
+    const setup = new URL(`/setup?token=${setupToken}`, base);
+    console.log(`\nNoch kein Konto vorhanden. Richte Theta hier ein:\n${setup}\n`);
+    return setup;
   }
+  const admin = new URL("/admin", base);
+  console.log(`Verwalten: ${admin}`);
+  return admin;
 }
+
+if (import.meta.main) startServer();

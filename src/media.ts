@@ -1,8 +1,10 @@
 import type { Database } from "bun:sqlite";
 import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import sharp, { type Metadata, type Sharp } from "sharp";
+import type { Metadata, Sharp } from "sharp";
+import { assetPath } from "./assets";
 import { type ImageInfo, ValidationError } from "./blocks";
+import sharp from "./sharp";
 
 // Uploaded images. Every upload is rotated upright, stripped of metadata such as GPS
 // positions, limited in size and stored with smaller WebP copies, so pages stay fast
@@ -165,6 +167,6 @@ function cleanFilename(name: string): string {
 // Files that ship with Theta itself (logo, favicon), served at /media/<name>.
 export function builtinMedia(name: string): string | null {
   if (!/^[\w.-]+$/.test(name) || name.startsWith(".")) return null;
-  const path = Bun.fileURLToPath(new URL(`../media/${name}`, import.meta.url));
+  const path = assetPath(`media/${name}`);
   return Bun.file(path).size > 0 ? path : null;
 }

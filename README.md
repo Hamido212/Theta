@@ -6,7 +6,18 @@ Ein einfaches, modernes CMS. Für alle, die eine Website pflegen wollen, ohne pr
 
 ## Ausprobieren
 
-Voraussetzung ist [Bun](https://bun.sh).
+**Ohne Terminal:** Lade unter [Releases](https://github.com/Hamido212/Theta/releases) die ZIP für dein System herunter (Windows, macOS mit Apple-Chip, Linux), entpacke sie und starte `theta` mit einem Doppelklick. Der Browser öffnet sich mit der Einrichtung. Deine Daten liegen im Ordner `theta-daten` neben dem Programm. Auf dem Mac bestätigst du den ersten Start mit Rechtsklick und „Öffnen“, unter Windows bei SmartScreen mit „Weitere Informationen“ und „Trotzdem ausführen“, weil das Programm noch nicht signiert ist.
+
+**Auf einem Server mit Docker:**
+
+```sh
+docker run -d -p 3000:3000 -v theta-daten:/data ghcr.io/hamido212/theta
+docker logs <Container>   # zeigt den Einrichtungs-Link
+```
+
+Datenbank, Bilder und Sicherungen liegen im Volume `/data`. Für den Betrieb im Internet setzt du `-e THETA_URL=https://deine-seite.de` und stellst einen Proxy mit HTTPS davor.
+
+**Zum Entwickeln** brauchst du [Bun](https://bun.sh):
 
 ```sh
 bun install
@@ -84,6 +95,7 @@ Das Titelbild hat außerdem die Darstellung **Profil mit Porträt** mit Kurzbeze
 | `src/render.tsx` | Rendert öffentliche Seiten, Blog, RSS-Feed, Sitemap und die Editor-Seite auf dem Server |
 | `src/editor/` | Der Editor im Browser (React) |
 | `src/server.ts` | HTTP-Server mit Hono |
+| `src/assets.ts`, `src/desktop.ts`, `src/sharp.ts` | Eingebaute Dateien und Start des fertigen Programms |
 
 Theme-Komponenten laufen an beiden Stellen: auf dem Server für die öffentliche Seite und im Browser für den Editor. So sehen beide Ansichten immer gleich aus.
 
@@ -106,7 +118,10 @@ Plugins kommen noch. Der Server lauscht standardmäßig nur auf dem eigenen Rech
 ```sh
 bun test           # Tests
 bun run typecheck  # Typprüfung
+bun run build      # Programm für diesen Rechner in dist/theta/
 ```
+
+`bun run build` packt Server, Editor, Stylesheets, Schriften und Bilder in eine einzige Programmdatei (`scripts/build.ts`, Einstieg `src/desktop.ts`). Nur die Bildbibliothek sharp liegt als Ordner `node_modules` daneben, weil sie aus nativen Bibliotheken besteht. Ein Tag wie `v0.1.0` baut über `.github/workflows/release.yml` die Programme für alle Systeme auf deren eigenen Rechnern, hängt sie an ein GitHub-Release und veröffentlicht das Docker-Image unter `ghcr.io/hamido212/theta`.
 
 Beim Start aktualisiert Theta ältere Datenbanken automatisch. Bereits öffentliche Seiten und Blogbeiträge bleiben veröffentlicht; bisherige Beitragsentwürfe bleiben privat. Lade vor einem Update eine Sicherung herunter.
 

@@ -1,0 +1,91 @@
+name: Release
+
+# Builds Theta as a program for Windows, macOS and Linux, plus a Docker image.
+# Runs for every tag like v0.1.0 (and creates a GitHub release with the downloads),
+# or by hand from the Actions tab (downloads then appear as artifacts of the run).
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  program:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, name: linux-x64, exe: theta }
+          - { os: ubuntu-24.04-arm, name: linux-arm64, exe: theta }
+          - { os: macos-latest, name: macos-arm64, exe: theta }
+          - { os: windows-latest, name: windows-x64, exe: theta.exe }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      # The program must start (which loads the image library) and serve the editor.
+      - name: Smoke test
+        run: |
+          THETA_OPEN=0 PORT=3999 ./dist/theta/${{ matrix.exe }} > theta.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:3999/ >/dev/null && break; sleep 1; done
+          curl -sf http://127.0.0.1:3999/ >/dev/null
+          curl -sf http://127.0.0.1:3999/assets/editor.js >/dev/null
+      - name: Package
+        run: |
+          cd dist
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            7z a -tzip ../theta-${{ matrix.name }}.zip theta >/dev/null
+          else
+            zip -qry ../theta-${{ matrix.name }}.zip theta
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: theta-${{ matrix.name }}
+          path: theta-${{ matrix.name }}.zip
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: program
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: theta-*.zip
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/theta
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') }}
+            type=sha
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
