@@ -104,7 +104,7 @@ gibst du sie dort genauso frei und startest Theta noch einmal.`,
 mit der Einrichtung, die Adresse steht auch im Terminal. Lass das Terminal offen, solange du
 an deiner Website arbeitest. Theta braucht glibc 2.28 oder neuer (etwa Ubuntu ab 20.04 oder Debian ab 10).`,
 }[platform === "win32" || platform === "darwin" ? platform : "linux"];
-const command = platform === "win32" ? "theta.exe" : "./theta";
+const command = platform === "win32" ? ".\\theta.exe" : "./theta";
 const terminal = platform === "win32" ? "Tippe in diesem Ordner oben in die Adresszeile cmd, drücke Enter und gib ein"
   : "Öffne in diesem Ordner ein Terminal und gib ein";
 const guide = `Theta

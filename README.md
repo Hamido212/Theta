@@ -52,7 +52,7 @@ Unter `/admin/shared-sections` legst du **gemeinsame Abschnitte** an, etwa eine 
 
 **Veröffentlichen in der zentralen Bearbeitung aktualisiert alle eingebundenen öffentlichen Seiten und Beiträge sofort.** Bloßes Speichern bleibt privat. Die Verwaltung zeigt die verwendenden Seiten; ein noch verwendeter Abschnitt lässt sich weder löschen noch zurückziehen. „In unabhängige Kopie umwandeln“ löst eine Einbindung auf Basis ihrer veröffentlichten Fassung; veröffentliche danach die Seite, um auch die Live-Einbindung zu entfernen. Geschützte Seitenvorschauen und der HTML-Export verwenden ebenfalls die veröffentlichte zentrale Fassung. Die Vorschau des zentralen Abschnitts selbst zeigt seinen gespeicherten Entwurf.
 
-Passwort vergessen? `bun run theta reset-password deine@adresse.de` setzt ein neues, zufälliges Passwort und zeigt es an. Im heruntergeladenen Programm heißt der Befehl `./theta reset-password deine@adresse.de` (Windows: `theta.exe reset-password …`), mit Docker `docker exec <Container> bun src/cli.ts reset-password deine@adresse.de`. Genauso gibt es `backup`, `restore` und `export`; `hilfe` zeigt alle Befehle.
+Passwort vergessen? `bun run theta reset-password deine@adresse.de` setzt ein neues, zufälliges Passwort und zeigt es an. Im heruntergeladenen Programm heißt der Befehl `./theta reset-password deine@adresse.de` (Windows: `.\theta.exe reset-password …`), mit Docker `docker exec <Container> bun src/cli.ts reset-password deine@adresse.de`. Genauso gibt es `backup`, `restore` und `export`; `hilfe` zeigt alle Befehle.
 
 ## Beispiel: seid.dev in Theta
 

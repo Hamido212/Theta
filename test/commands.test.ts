@@ -40,6 +40,15 @@ describe("maintenance commands", () => {
     expect(await auth.verify("erika@example.com", password!)).not.toBeNull();
   });
 
+  test("a reset while Theta runs lifts the lock after too many failed logins", async () => {
+    const server = new AuthStore(openDatabase(db));
+    for (let i = 0; i < 10; i++) expect(await server.verify("erika@example.com", "falsch-falsch")).toBeNull();
+    await expect(server.verify("erika@example.com", "falsch-falsch")).rejects.toThrow("Zu viele Fehlversuche");
+    expect(await runCommand(["reset-password", "erika@example.com"], "./theta")).toBe(0);
+    const password = output.join("\n").match(/: (\S+)$/m)?.[1];
+    expect(await server.verify("erika@example.com", password!)).toMatchObject({ email: "erika@example.com" });
+  });
+
   test("an unknown address fails with a message", async () => {
     expect(await runCommand(["reset-password", "niemand@example.com"], "./theta")).toBe(1);
     expect(output.join("\n")).toContain("niemand@example.com");
@@ -54,6 +63,13 @@ describe("maintenance commands", () => {
   test("restore asks for confirmation with the caller's own command", async () => {
     expect(await runCommand(["restore", join(dir, "sicherung.zip")], "theta.exe")).toBe(1);
     expect(output.join("\n")).toContain(`theta.exe restore ${join(dir, "sicherung.zip")} --ja`);
+  });
+
+  test("a missing backup file or a wrong address gets a plain message", async () => {
+    expect(await runCommand(["restore", join(dir, "gibt-es-nicht.zip"), "--ja"], "./theta")).toBe(1);
+    expect(output.join("\n")).toContain("gibt-es-nicht.zip gibt es nicht");
+    expect(await runCommand(["export", join(dir, "export"), "meine-seite"], "./theta")).toBe(1);
+    expect(output.join("\n")).toContain("Bitte die Adresse der Website angeben");
   });
 
   test("help lists every command for the caller, a wrong call fails", async () => {

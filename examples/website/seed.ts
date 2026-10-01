@@ -143,7 +143,7 @@ export async function seedWebsite({ db, pages, settings, media }: { db: Database
     faq([
       { question: "Mein Mac lässt Theta nicht starten.", answer: "Theta ist noch nicht bei Apple signiert, deshalb blockiert macOS den ersten Start. Öffne Systemeinstellungen → Datenschutz & Sicherheit und klicke unten bei „theta“ auf „Trotzdem öffnen“. Wer das Terminal kennt, gibt den ganzen Ordner auf einmal frei. Wie das geht, steht in der „LIESMICH.txt“ in der ZIP." },
       { question: "Windows zeigt eine SmartScreen-Warnung.", answer: "Klicke auf „Weitere Informationen“ und dann auf „Trotzdem ausführen“. Auch hier fehlt noch eine Signatur." },
-      { question: "Ich habe mein Passwort vergessen.", answer: "Öffne im Ordner von Theta ein Terminal und gib „./theta reset-password deine@adresse.de“ ein, unter Windows „theta.exe reset-password deine@adresse.de“. Theta zeigt dann ein neues Passwort an." },
+      { question: "Ich habe mein Passwort vergessen.", answer: "Öffne im Ordner von Theta ein Terminal und gib „./theta reset-password deine@adresse.de“ ein, unter Windows „.\\\\theta.exe reset-password deine@adresse.de“. Theta zeigt dann ein neues Passwort an." },
       { question: "Wo liegen meine Daten?", answer: "Im Ordner „theta-daten“ neben dem Programm. Unter „Übersicht“ lädst du jederzeit eine Sicherung herunter. Auf einem neuen Rechner spielst du sie gleich bei der Einrichtung ein." },
       { question: "Wie kommt meine Website ins Internet?", answer: "Unter „Übersicht“ lädst du die Website als ZIP mit fertigen HTML-Dateien herunter. Die lädst du bei deinem Webhoster hoch. Kontaktformulare brauchen dagegen einen laufenden Theta-Server." },
     ]),

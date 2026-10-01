@@ -32,7 +32,7 @@ export async function runCommand(args: string[], program: string): Promise<numbe
 
   if (command === "export" && arg) {
     const [dir, url] = [arg, extra ?? process.env.THETA_URL];
-    if (!url) {
+    if (!url || !URL.canParse(url)) {
       console.error(`Bitte die Adresse der Website angeben: ${program} export <Ordner> https://meine-seite.de`);
       return 1;
     }
@@ -60,6 +60,10 @@ export async function runCommand(args: string[], program: string): Promise<numbe
     if (extra !== "--ja") {
       console.error("Das Einspielen ersetzt die ganze Website. Beende zuerst Theta und bestätige mit:");
       console.error(`  ${program} restore ${arg} --ja`);
+      return 1;
+    }
+    if (!(await Bun.file(arg).exists())) {
+      console.error(`Die Datei ${arg} gibt es nicht.`);
       return 1;
     }
     const { backups } = open();

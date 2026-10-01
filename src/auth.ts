@@ -13,7 +13,7 @@ const FAILURE_WINDOW_MS = 15 * 60 * 1000;
 export class AuthError extends Error {}
 
 export class AuthStore {
-  private failures = new Map<string, { count: number; since: number }>();
+  private failures = new Map<string, { count: number; since: number; hash?: string }>();
 
   constructor(private db: Database) {}
 
@@ -53,24 +53,25 @@ export class AuthStore {
   // Returns the user when email and password match, otherwise null.
   async verify(email: string, password: string): Promise<User | null> {
     const key = email.trim().toLowerCase();
-    const failure = this.failures.get(key);
-    if (failure && Date.now() - failure.since > FAILURE_WINDOW_MS) this.failures.delete(key);
-    if ((this.failures.get(key)?.count ?? 0) >= MAX_FAILURES) {
-      throw new AuthError("Zu viele Fehlversuche. Bitte in ein paar Minuten erneut versuchen.");
-    }
-
     const row = this.db
       .query<User & { password_hash: string }, [string]>(
         "SELECT id, email, name, password_hash FROM users WHERE email = ?",
       )
       .get(email.trim());
+    // A new password, e.g. from `theta reset-password` while Theta runs, starts a fresh count.
+    const failure = this.failures.get(key);
+    if (failure && (Date.now() - failure.since > FAILURE_WINDOW_MS || failure.hash !== row?.password_hash)) this.failures.delete(key);
+    if ((this.failures.get(key)?.count ?? 0) >= MAX_FAILURES) {
+      throw new AuthError("Zu viele Fehlversuche. Bitte in ein paar Minuten erneut versuchen.");
+    }
+
     // Verify against a dummy hash for unknown addresses so timing does not reveal which exist.
     const ok = await Bun.password.verify(password, row?.password_hash ?? (await dummyHash));
     if (row && ok) {
       this.failures.delete(key);
       return { id: row.id, email: row.email, name: row.name };
     }
-    const current = this.failures.get(key) ?? { count: 0, since: Date.now() };
+    const current = this.failures.get(key) ?? { count: 0, since: Date.now(), hash: row?.password_hash };
     this.failures.set(key, { ...current, count: current.count + 1 });
     if (this.failures.size > 1000) this.forgetOldFailures();
     return null;

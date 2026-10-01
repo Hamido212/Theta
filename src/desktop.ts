@@ -11,9 +11,9 @@ mkdirSync(dirname(process.env.THETA_DB), { recursive: true });
 
 // Started from a terminal with a maintenance command, e.g. ./theta reset-password you@example.com:
 // run it on the same data instead of the website. Anything else starts Theta as usual.
-const args = process.argv.slice(2);
-if (args[0] && commands.includes(args[0])) {
-  process.exit(await runCommand(args, process.platform === "win32" ? "theta.exe" : "./theta"));
+const [word, ...rest] = process.argv.slice(2);
+if (word && commands.includes(word.toLowerCase())) {
+  process.exit(await runCommand([word.toLowerCase(), ...rest], process.platform === "win32" ? ".\\theta.exe" : "./theta"));
 }
 
 let url: URL | undefined;
