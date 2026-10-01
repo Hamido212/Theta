@@ -9,7 +9,9 @@
     "start": "bun src/server.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "theta": "bun src/cli.ts"
+    "theta": "bun src/cli.ts",
+    "demo:seid": "bun examples/seid/run.ts",
+    "demo:seid:export": "bun examples/seid/run.ts --export"
   },
   "dependencies": {
     "hono": "^4.13.12",

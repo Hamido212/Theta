@@ -10,16 +10,21 @@ type TextFieldProps = {
   multiline?: boolean;
   // Allows bold, italic, links and lists (see src/richtext.ts). Implies multiline.
   rich?: boolean;
+  // A plain-text fragment emphasized by the theme, e.g. a name in a profile title.
+  highlight?: string;
   placeholder?: string;
 };
 
-export function TextField({ value, onChange, multiline = false, rich = false, placeholder }: TextFieldProps) {
+export function TextField({ value, onChange, multiline = false, rich = false, highlight, placeholder }: TextFieldProps) {
   if (onChange) {
     if (rich) return <RichEditable value={value} onChange={onChange} placeholder={placeholder} />;
-    return <EditableText value={value} onChange={onChange} multiline={multiline} placeholder={placeholder} />;
+    return <EditableText value={value} onChange={onChange} multiline={multiline} highlight={highlight} placeholder={placeholder} />;
   }
   if (rich) return <RichText value={value} />;
-  if (!multiline) return <>{value}</>;
+  if (!multiline) {
+    const at = highlight ? value.indexOf(highlight) : -1;
+    return at < 0 ? <>{value}</> : <>{value.slice(0, at)}<strong className="t-highlight">{highlight}</strong>{value.slice(at + highlight!.length)}</>;
+  }
   return <>{paragraphs(value).map((lines, i) => <p key={i}>{withLineBreaks(lines)}</p>)}</>;
 }
 
@@ -40,16 +45,27 @@ function withLineBreaks(text: string) {
   ));
 }
 
-type EditableTextProps = Required<Omit<TextFieldProps, "placeholder" | "rich">> & { placeholder?: string };
+type EditableTextProps = Required<Omit<TextFieldProps, "placeholder" | "rich" | "highlight">> & { placeholder?: string; highlight?: string };
 
-function EditableText({ value, onChange, multiline, placeholder }: EditableTextProps) {
+function EditableText({ value, onChange, multiline, highlight, placeholder }: EditableTextProps) {
   const ref = useRef<HTMLElement>(null);
+  const previousHighlight = useRef(highlight);
 
   // The element is uncontrolled while typing; only sync when the value changed from outside.
   useLayoutEffect(() => {
     const el = ref.current;
-    if (el && el.innerText !== value) el.innerText = value;
-  }, [value]);
+    if (el && (el.innerText !== value || previousHighlight.current !== highlight)) {
+      const at = highlight ? value.indexOf(highlight) : -1;
+      if (at < 0) el.innerText = value;
+      else {
+        const mark = document.createElement("strong");
+        mark.className = "t-highlight";
+        mark.textContent = highlight!;
+        el.replaceChildren(document.createTextNode(value.slice(0, at)), mark, document.createTextNode(value.slice(at + highlight!.length)));
+      }
+      previousHighlight.current = highlight;
+    }
+  }, [value, highlight]);
 
   // A <span> stays valid inside headings; multiline text needs a block element.
   const Tag = multiline ? "div" : "span";

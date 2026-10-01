@@ -32,7 +32,7 @@ import {
   emptyPriceItem,
   emptyTeamMember,
 } from "../blocks";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { videoSource } from "../theme/video";
 import { FocalPointPicker } from "./focal-point";
 import { MediaPicker } from "./media-picker";
@@ -208,11 +208,22 @@ function HeroSettings({ block, onChange, pages }: Props<HeroBlock>) {
     onChange({ buttons: block.buttons.map((button, i) => (i === index ? { ...button, href } : button)) });
   return (
     <div className="theta-settings">
+      <label>Darstellung<select value={block.layout ?? "banner"} onChange={(e) => onChange({ layout: e.target.value as HeroBlock["layout"] })}><option value="banner">Großes Titelbild</option><option value="profile">Profil mit Porträt</option></select></label>
+      {block.layout === "profile" && <>
+        <label>Kurzbezeichnung<input value={block.eyebrow ?? ""} onChange={(e) => onChange({ eyebrow: e.target.value })} /></label>
+        <label>Hervorgehobener Text im Titel<input value={block.highlight ?? ""} onChange={(e) => onChange({ highlight: e.target.value })} /></label>
+        {(block.links ?? []).map((link, i) => <fieldset key={i}><legend>Profil-Link {i + 1}</legend>
+          <label>Beschriftung<input value={link.label} onChange={(e) => onChange({ links: block.links!.map((item, n) => n === i ? { ...item, label: e.target.value } : item) })} /></label>
+          <LinkTarget id={`${block.id}-social-${i}`} label="Ziel" value={link.href} pages={pages} onChange={(href) => onChange({ links: block.links!.map((item, n) => n === i ? { ...item, href } : item) })} />
+          <button className="theta-button" onClick={() => onChange({ links: block.links!.filter((_, n) => n !== i) })}>Link entfernen</button>
+        </fieldset>)}
+        <button className="theta-button" disabled={(block.links?.length ?? 0) >= 8} onClick={() => onChange({ links: [...(block.links ?? []), emptyHeroButton()] })}>+ Profil-Link</button>
+      </>}
       <div className="theta-inline">
-        <MediaPicker label={block.src ? "Anderes Bild wählen" : "Hintergrundbild wählen oder hochladen"} onSelect={([item]) => onChange({ src: item!.url })} />
+        <MediaPicker label={block.src ? "Anderes Bild wählen" : block.layout === "profile" ? "Porträt wählen oder hochladen" : "Hintergrundbild wählen oder hochladen"} onSelect={([item]) => onChange({ src: item!.url })} />
         {block.src && (
           <button className="theta-button" onClick={() => onChange({ src: "", alt: "" })}>
-            Ohne Bild, in Akzentfarbe
+            {block.layout === "profile" ? "Porträt entfernen" : "Ohne Bild, in Akzentfarbe"}
           </button>
         )}
       </div>
@@ -268,6 +279,8 @@ function ColumnsSettings({ block, onChange, pages }: Props<ColumnsBlock>) {
         <select aria-label="Darstellung der Spalten" value={block.style} onChange={(e) => onChange({ style: e.target.value as ColumnsBlock["style"] })}>
           <option value="cards">Karten mit Bild</option>
           <option value="plain">Nur Text</option>
+          <option value="list">Karten untereinander</option>
+          <option value="timeline">Zeitlicher Verlauf</option>
         </select>
         <span>{block.items.length} Spalten</span>
         <button className="theta-button" disabled={block.items.length >= MAX_COLUMNS} onClick={() => onChange({ items: [...block.items, emptyColumn()] })}>
@@ -277,11 +290,20 @@ function ColumnsSettings({ block, onChange, pages }: Props<ColumnsBlock>) {
           − Letzte Spalte entfernen
         </button>
       </div>
-      {block.style === "cards" &&
+      {(block.style === "list" || block.style === "timeline") && <>
+        <label>Überschrift<input value={block.heading ?? ""} onChange={(e) => onChange({ heading: e.target.value })} /></label>
+        <label>Link-Beschriftung<input value={block.linkLabel ?? ""} onChange={(e) => onChange({ linkLabel: e.target.value })} /></label>
+        <LinkTarget id={`${block.id}-all`} label="Ziel des Überschrift-Links" value={block.href ?? ""} pages={pages} onChange={(href) => onChange({ href })} />
+      </>}
+      {block.style !== "plain" &&
         block.items.map((item, i) => (
           <fieldset key={i} className="theta-card-settings">
             <legend>Karte {i + 1}</legend>
-            <div className="theta-inline">
+            {(block.style === "list" || block.style === "timeline") && <>
+              <label>Datum oder Zeitraum<input value={item.meta ?? ""} onChange={(e) => update(i, { meta: e.target.value })} /></label>
+              <label>Tags (mit Komma trennen)<TagsInput tags={item.tags ?? []} onChange={(tags) => update(i, { tags })} /></label>
+            </>}
+            {block.style === "cards" && <><div className="theta-inline">
               <MediaPicker label={item.src ? "Anderes Bild" : "Bild wählen"} onSelect={([picked]) => update(i, { src: picked!.url })} />
               {item.src && (
                 <button className="theta-button" onClick={() => update(i, { src: "", alt: "" })}>
@@ -293,12 +315,29 @@ function ColumnsSettings({ block, onChange, pages }: Props<ColumnsBlock>) {
               <input value={item.alt} placeholder="Bildbeschreibung" aria-label={`Karte ${i + 1}: Bildbeschreibung`} onChange={(e) => update(i, { alt: e.target.value })} />
             )}
             <AltHint src={item.src} alt={item.alt} />
-            <FocalPointPicker image={item} onChange={(focal) => update(i, { focal })} />
+            <FocalPointPicker image={item} onChange={(focal) => update(i, { focal })} /></>}
             <LinkTarget id={`${block.id}-${i}`} label="Link (optional)" value={item.href} pages={pages} onChange={(href) => update(i, { href })} />
           </fieldset>
         ))}
     </div>
   );
+}
+
+// Keep the raw input while typing: normalizing a trailing comma on every render
+// would remove it before a second tag can be entered. The block still gets clean tags.
+function TagsInput({ tags, onChange }: { tags: string[]; onChange: (tags: string[]) => void }) {
+  const [raw, setRaw] = useState(tags.join(", "));
+  const sent = useRef(JSON.stringify(tags));
+  useEffect(() => {
+    const key = JSON.stringify(tags);
+    if (key !== sent.current) { sent.current = key; setRaw(tags.join(", ")); }
+  }, [tags]);
+  return <input value={raw} onChange={(event) => {
+    setRaw(event.target.value);
+    const next = event.target.value.split(",").map((tag) => tag.trim()).filter(Boolean);
+    sent.current = JSON.stringify(next);
+    onChange(next);
+  }} />;
 }
 
 function VideoSettings({ block, onChange }: Props<VideoBlock>) {

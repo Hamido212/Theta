@@ -285,7 +285,7 @@ function Editor({ page, site, nav, legal, pages, templates = [] }: EditorData) {
       <SiteFrame site={site} nav={nav} legal={legal} current={post ? BLOG : page.slug} linkTo={editPath}>
         {post && (
           <p className="t-post-meta">
-            {publishedAt ? formatDate(publishedAt ?? new Date().toISOString()) : "Entwurf, noch nicht veröffentlicht"}
+            {publishedAt ? formatDate(publishedAt ?? new Date().toISOString(), site.language) : "Entwurf, noch nicht veröffentlicht"}
           </p>
         )}
         <BlockFlow blocks={blocks}>
