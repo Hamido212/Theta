@@ -539,3 +539,32 @@ select {
 .a-redirect {
   overflow-wrap: anywhere;
 }
+
+.a-form .a-confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  color: var(--a-text);
+}
+
+.a-form .a-confirm input {
+  margin-top: 0.2rem;
+  padding: 0;
+}
+
+.a-form .a-danger {
+  background: transparent;
+  border: 1px solid var(--a-error);
+  color: var(--a-error);
+}
+
+.a-setup-restore {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--a-border);
+}
+
+.a-setup-restore h2 {
+  font-size: 1.1rem;
+  margin: 0 0 0.5rem;
+}

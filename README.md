@@ -2,11 +2,34 @@
 
 Ein einfaches, modernes CMS. Für alle, die eine Website pflegen wollen, ohne programmieren zu können, und für Entwickler, die es erweitern.
 
+**Hugo und Astro sind für Leute, die Websites bauen. Theta ist für Leute, die ihre Website selbst pflegen.**
+
+| | Hugo | Astro | Theta |
+|---|---|---|---|
+| Texte ändern | Datei bearbeiten, neu bauen | Code oder Datei bearbeiten, neu bauen | Auf der Seite klicken und tippen |
+| Design | Theme programmieren | Komponenten programmieren | Vorlage wählen, Regler einstellen |
+| JavaScript für Besucher | keins | keins, außer gewollt | keins |
+| Kontaktformular, Karte, Blog | selbst bauen oder Fremddienst | selbst bauen oder Fremddienst | eingebaut, ohne Fremddienste |
+| Installation | Programm und Terminal | Node und Terminal | Herunterladen und doppelklicken |
+
+Noch nicht enthalten sind Plugins und mehrsprachige Seiten. Wer Tausende Seiten aus Dateien erzeugt und gerne mit Git arbeitet, ist mit Hugo oder Astro gut bedient. Die [Theta-Website](examples/website/README.md) ist selbst mit Theta gebaut und erklärt den Unterschied ausführlicher.
+
 ![Der Theta-Editor mit Seitennavigation und Bild-Einstellungen](docs/editor-workbench.jpg)
 
 ## Ausprobieren
 
-Voraussetzung ist [Bun](https://bun.sh).
+**Ohne Terminal:** Lade unter [Releases](https://github.com/Hamido212/Theta/releases) die ZIP für dein System herunter (Windows, macOS mit Apple-Chip, Linux), entpacke sie und starte `theta` mit einem Doppelklick. Der Browser öffnet sich mit der Einrichtung. Deine Daten liegen im Ordner `theta-daten` neben dem Programm. Auf dem Mac bestätigst du den ersten Start mit Rechtsklick und „Öffnen“, unter Windows bei SmartScreen mit „Weitere Informationen“ und „Trotzdem ausführen“, weil das Programm noch nicht signiert ist.
+
+**Auf einem Server mit Docker:**
+
+```sh
+docker run -d -p 3000:3000 -v theta-daten:/data ghcr.io/hamido212/theta
+docker logs <Container>   # zeigt den Einrichtungs-Link
+```
+
+Datenbank, Bilder und Sicherungen liegen im Volume `/data`. Für den Betrieb im Internet setzt du `-e THETA_URL=https://deine-seite.de` und stellst einen Proxy mit HTTPS davor.
+
+**Zum Entwickeln** brauchst du [Bun](https://bun.sh):
 
 ```sh
 bun install
@@ -43,7 +66,8 @@ Start, Bearbeitung, Export und Unterschiede zum Original sind in [examples/seid/
 
 - **Direkt auf der Seite bearbeiten.** Der Editor zeigt die Seite genau so, wie Besucher sie sehen. Texte ändert man an Ort und Stelle, Blöcke lassen sich hinzufügen, verschieben und löschen.
 - **Leitplanken statt Stil-Chaos.** Blöcke speichern nur Inhalt. Farben, Schriften und Abstände kommen aus Design-Tokens, deshalb bleibt die Seite immer stimmig. Unter `/admin/design` wählst du eine von fünf Vorlagen (Klar, Modern, Warm, Studio, Portfolio) und passt Akzentfarbe, Schrift, Abstände, Ecken, Breite und Hell/Dunkel an. Neben den Schriften des Geräts bringt Theta fünf freie Schriften mit (Inter, Fraunces, Lora, Space Grotesk und Atkinson, SIL Open Font License). Die Website liefert sie selbst aus, nur die tatsächlich gewählten, und nie über fremde Server wie Google Fonts. Theta warnt bei schlecht lesbaren Farben, wählt die Textfarbe auf Buttons selbst und hellt die Akzentfarbe im Dunkelmodus automatisch auf.
-- **Die Website gehört dir.** Alle Inhalte liegen in einer SQLite-Datei (`theta.db`), hochgeladene Bilder im Ordner `uploads/` daneben. Für eine vollständige Kopie stoppst du den Server und kopierst Datenbank und Uploads zusammen. Unter `/admin` lädst du die veröffentlichte Website als ZIP mit fertigen HTML-Dateien herunter, die bei jedem Webhoster laufen, auch ohne Theta. Im Terminal geht das mit `bun run theta export <Ordner> https://deine-seite.de`. Dieser HTML-Export enthält nur öffentliche Fassungen; Entwürfe, Verlauf, Konten und eigene Vorlagen bleiben in der Datenbank.
+- **Die Website gehört dir.** Alle Inhalte liegen in einer SQLite-Datei (`theta.db`), hochgeladene Bilder im Ordner `uploads/` daneben. Unter `/admin` lädst du die veröffentlichte Website als ZIP mit fertigen HTML-Dateien herunter, die bei jedem Webhoster laufen, auch ohne Theta. Im Terminal geht das mit `bun run theta export <Ordner> https://deine-seite.de`. Dieser HTML-Export enthält nur öffentliche Fassungen; Entwürfe, Verlauf, Konten und eigene Vorlagen bleiben in der Datenbank.
+- **Sichern und umziehen.** Unter `/admin` lädst du mit „Sicherung herunterladen“ eine ZIP mit allem herunter, was zur Website gehört: Seiten mit Entwürfen und Verlauf, Papierkorb, Bilder, Design, Vorlagen, Nachrichten und Konten. Das geht auch, während jemand bearbeitet. Mit „Sicherung einspielen“ holst du einen früheren Stand zurück; Theta legt vorher den jetzigen Stand im Ordner `sicherungen/` neben der Datenbank ab, und danach meldest du dich neu an. Auf einem neuen Rechner bietet schon die Einrichtungsseite „Umzug von einem anderen Rechner?“ an, statt ein neues Konto anzulegen. Im Terminal geht das mit `bun run theta backup [Datei.zip]` und, bei gestopptem Server, `bun run theta restore <Datei.zip> --ja`. Bewahre Sicherungen gut auf: Sie enthalten Nachrichten von Besuchern und ein eingetragenes E-Mail-Passwort. Anmeldungen sind nicht enthalten.
 - **Bewusst veröffentlichen.** Neue Seiten und Beiträge starten als Entwurf. Seitentitel, Beschreibung, Menü-Sichtbarkeit und Inhalt werden gemeinsam veröffentlicht. Öffentliche Navigation, RSS, Sitemap und Export verwenden diese Live-Fassung. Änderungen am Design und an den allgemeinen Website-Einstellungen werden direkt übernommen.
 - **Verlauf und Papierkorb.** Inhaltliche Speicherungen halten bis zu 50 Fassungen je Seite fest. Autosaves derselben Person werden innerhalb von fünf Minuten gebündelt; manuelles Speichern und Veröffentlichen bilden Grenzen. Über „Verlauf“ stellst du eine frühere Fassung als gespeicherten Entwurf wieder her. Theta sichert vorher auch noch nicht gespeicherte Eingaben; der Stand vor dem Wechsel bleibt im Verlauf. Besucher sehen weiterhin die Live-Fassung, bis du ausdrücklich veröffentlichst. Gelöschte Seiten und Beiträge landen im Papierkorb und lassen sich als Entwurf wiederherstellen. Ihre Adresse bleibt reserviert. Bilder aus Entwürfen, Live-Fassungen, Verlauf, Papierkorb und eigenen Vorlagen werden vor dem Löschen geschützt.
 - **Schnell ab Werk.** Die öffentliche Seite ist reines HTML und CSS, ganz ohne JavaScript.
@@ -77,11 +101,13 @@ Das Titelbild hat außerdem die Darstellung **Profil mit Porträt** mit Kurzbeze
 | `src/contact.ts` | Nachrichten aus Kontaktformularen, Spamschutz und E-Mail-Versand per SMTP |
 | `src/media.ts` | Hochgeladene Bilder: Prüfung, Optimierung, kleinere Versionen |
 | `src/export.ts`, `src/zip.ts` | Export der Website als statische Dateien bzw. ZIP |
+| `src/backup.ts` | Vollständige Sicherung (Datenbank und Bilder) und ihre Wiederherstellung |
 | `src/admin/` | Verwaltung (Seiten, Blog, Mediathek, Nachrichten, Design), Anmelde- und Einrichtungsseiten |
 | `src/theme/` | Das Theme: Kopfzeile mit Menü, Block-Komponenten, CSS und Design-Tokens (`tokens.ts`) |
 | `src/render.tsx` | Rendert öffentliche Seiten, Blog, RSS-Feed, Sitemap und die Editor-Seite auf dem Server |
 | `src/editor/` | Der Editor im Browser (React) |
 | `src/server.ts` | HTTP-Server mit Hono |
+| `src/assets.ts`, `src/desktop.ts`, `src/sharp.ts` | Eingebaute Dateien und Start des fertigen Programms |
 
 Theme-Komponenten laufen an beiden Stellen: auf dem Server für die öffentliche Seite und im Browser für den Editor. So sehen beide Ansichten immer gleich aus.
 
@@ -104,9 +130,12 @@ Plugins kommen noch. Der Server lauscht standardmäßig nur auf dem eigenen Rech
 ```sh
 bun test           # Tests
 bun run typecheck  # Typprüfung
+bun run build      # Programm für diesen Rechner in dist/theta/
 ```
 
-Beim Start aktualisiert Theta ältere Datenbanken automatisch. Bereits öffentliche Seiten und Blogbeiträge bleiben veröffentlicht; bisherige Beitragsentwürfe bleiben privat. Sichere vor einem Update die gestoppte Datenbank samt Uploads.
+`bun run build` packt Server, Editor, Stylesheets, Schriften und Bilder in eine einzige Programmdatei (`scripts/build.ts`, Einstieg `src/desktop.ts`). Nur die Bildbibliothek sharp liegt als Ordner `node_modules` daneben, weil sie aus nativen Bibliotheken besteht. Ein Tag wie `v0.1.0` baut über `.github/workflows/release.yml` die Programme für alle Systeme auf deren eigenen Rechnern, hängt sie an ein GitHub-Release und veröffentlicht das Docker-Image unter `ghcr.io/hamido212/theta`.
+
+Beim Start aktualisiert Theta ältere Datenbanken automatisch. Bereits öffentliche Seiten und Blogbeiträge bleiben veröffentlicht; bisherige Beitragsentwürfe bleiben privat. Lade vor einem Update eine Sicherung herunter.
 
 Die Speicher-API `PUT /api/pages/:slug` erwartet die zuletzt gelesene numerische `version` und optional `action: "save" | "publish" | "unpublish"` (Standard: `save`). Eine erfolgreiche Antwort enthält die neue Version. Ein veralteter Stand liefert HTTP 409 und verändert keine Inhalte. Die Startseite bleibt veröffentlicht. Der Vergleich mit EmDash und die Umsetzungsliste stehen in [docs/emdash-vergleich.md](docs/emdash-vergleich.md) und [docs/umsetzung-editor.md](docs/umsetzung-editor.md).
 

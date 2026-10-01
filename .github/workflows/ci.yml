@@ -14,3 +14,9 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
       - run: bun test
+      # The single-file program must still build and start.
+      - run: bun run build
+      - run: |
+          THETA_OPEN=0 PORT=3999 ./dist/theta/theta > theta.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:3999/ >/dev/null && break; sleep 1; done
+          curl -sf http://127.0.0.1:3999/assets/editor.js >/dev/null

@@ -1,5 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { assetFile } from "./assets";
 import { BLOG, HOME } from "./blocks";
 import { builtinMedia, type MediaStore } from "./media";
 import { type SiteContext, renderBlogIndex, renderFeed, renderNotFound, renderPage, renderRobots, renderSitemap } from "./render";
@@ -41,10 +42,10 @@ export async function exportSite({ pages, settings, media }: Stores, origin: str
   files.set("404.html", encoder.encode(renderNotFound(context)));
   files.set("sitemap.xml", encoder.encode(renderSitemap([...all, ...posts], origin)));
   files.set("robots.txt", encoder.encode(renderRobots(origin)));
-  files.set("assets/theme.css", await Bun.file(new URL("./theme/theme.css", import.meta.url)).bytes());
+  files.set("assets/theme.css", await assetFile("src/theme/theme.css").bytes());
   for (const font of FONTS[settings.theme().fonts].web) {
-    for (const name of fontFiles(font)) files.set(`assets/fonts/${name}`, await Bun.file(new URL(`./theme/fonts/${name}`, import.meta.url)).bytes());
-    if (font === "atkinson") files.set("licenses/atkinson-OFL.txt", await Bun.file(new URL("./theme/fonts/atkinson-LICENSE.txt", import.meta.url)).bytes());
+    for (const name of fontFiles(font)) files.set(`assets/fonts/${name}`, await assetFile(`src/theme/fonts/${name}`).bytes());
+    if (font === "atkinson") files.set("licenses/atkinson-OFL.txt", await assetFile("src/theme/fonts/atkinson-LICENSE.txt").bytes());
   }
 
   // Copy exactly the images the pages refer to, including their smaller versions.

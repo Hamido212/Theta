@@ -1,4 +1,5 @@
 import { AuthStore } from "../src/auth";
+import { Backups } from "../src/backup";
 import { ContactStore, type Mailer } from "../src/contact";
 import type { Geocoder } from "../src/geocode";
 import { mkdtempSync } from "node:fs";
@@ -50,10 +51,12 @@ export async function testSite({ login = false } = {}) {
     cookie = `theta_session=${auth.createSession(user.id).token}`;
   }
   const places = fakeGeocoder();
-  const app = createApp({ pages, settings, media, auth, contact, geocoder: places.geocoder, setupToken: SETUP_TOKEN });
+  const safety = mkdtempSync(join(tmpdir(), "theta-safety-"));
+  const backups = new Backups(db, uploads, safety);
+  const app = createApp({ pages, settings, media, auth, contact, geocoder: places.geocoder, setupToken: SETUP_TOKEN, backups });
   const request = (path: string, init: RequestInit = {}) =>
     app.request(path, { ...init, headers: { cookie, ...init.headers } });
-  return { app, auth, pages, settings, media, uploads, db, request, contact, mail, places };
+  return { app, auth, pages, settings, media, uploads, db, request, contact, mail, places, backups, safety };
 }
 
 export const form = (fields: Record<string, string>) => ({

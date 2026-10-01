@@ -1,0 +1,12 @@
+.git
+node_modules
+dist
+build
+*.db
+*.db-shm
+*.db-wal
+uploads
+sicherungen
+theta-daten
+examples/seid/data
+examples/seid/export
