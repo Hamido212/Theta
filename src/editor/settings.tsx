@@ -146,6 +146,13 @@ function ImageSettings({ block, onChange }: Props<ImageBlock>) {
       </label>
       <AltHint src={block.src} alt={block.alt} />
       <FocalPointPicker image={block} onChange={(focal) => onChange({ focal })} />
+      <label>
+        Rahmen
+        <select value={block.frame ?? "none"} onChange={(e) => onChange({ frame: e.target.value as ImageBlock["frame"] })}>
+          <option value="none">Ohne</option>
+          <option value="browser">Browserfenster, für Bildschirmfotos</option>
+        </select>
+      </label>
     </div>
   );
 }
@@ -217,9 +224,11 @@ function HeroSettings({ block, onChange, pages }: Props<HeroBlock>) {
     <div className="theta-settings">
       {block.layout !== "profile" && <label>Inhaltsbreite des Titelbilds<select value={block.width ?? "content"} onChange={(event) => onChange({ width: event.target.value as HeroBlock["width"] })}><option value="content">Textbreite</option><option value="wide">Breit</option><option value="full">Ganze Fensterbreite</option></select></label>}
       <label>Darstellung<select value={block.layout ?? "banner"} onChange={(e) => onChange({ layout: e.target.value as HeroBlock["layout"] })}><option value="banner">Großes Titelbild</option><option value="profile">Profil mit Porträt</option></select></label>
+      {block.layout !== "profile" && <label>Ausrichtung<select value={block.align ?? "left"} onChange={(e) => onChange({ align: e.target.value as HeroBlock["align"] })}><option value="left">Links</option><option value="center">Zentriert</option></select></label>}
+      {block.layout !== "profile" && !block.src && <label>Hintergrund ohne Bild<select value={block.tone ?? "accent"} onChange={(e) => onChange({ tone: e.target.value as HeroBlock["tone"] })}><option value="accent">Akzentfarbe</option><option value="glow">Sanfter Farbverlauf</option></select></label>}
+      <label>Kurzbezeichnung über dem Titel<input value={block.eyebrow ?? ""} onChange={(e) => onChange({ eyebrow: e.target.value })} /></label>
+      <label>Hervorgehobener Text im Titel<input value={block.highlight ?? ""} onChange={(e) => onChange({ highlight: e.target.value })} /></label>
       {block.layout === "profile" && <>
-        <label>Kurzbezeichnung<input value={block.eyebrow ?? ""} onChange={(e) => onChange({ eyebrow: e.target.value })} /></label>
-        <label>Hervorgehobener Text im Titel<input value={block.highlight ?? ""} onChange={(e) => onChange({ highlight: e.target.value })} /></label>
         {(block.links ?? []).map((link, i) => <fieldset key={i}><legend>Profil-Link {i + 1}</legend>
           <label>Beschriftung<input value={link.label} onChange={(e) => onChange({ links: block.links!.map((item, n) => n === i ? { ...item, label: e.target.value } : item) })} /></label>
           <LinkTarget id={`${block.id}-social-${i}`} label="Ziel" value={link.href} pages={pages} onChange={(href) => onChange({ links: block.links!.map((item, n) => n === i ? { ...item, href } : item) })} />
@@ -231,7 +240,7 @@ function HeroSettings({ block, onChange, pages }: Props<HeroBlock>) {
         <MediaPicker label={block.src ? "Anderes Bild wählen" : block.layout === "profile" ? "Porträt wählen oder hochladen" : "Hintergrundbild wählen oder hochladen"} onSelect={([item]) => onChange({ src: item!.url })} />
         {block.src && (
           <button className="theta-button" onClick={() => onChange({ src: "", alt: "" })}>
-            {block.layout === "profile" ? "Porträt entfernen" : "Ohne Bild, in Akzentfarbe"}
+            {block.layout === "profile" ? "Porträt entfernen" : "Ohne Bild"}
           </button>
         )}
       </div>
@@ -289,6 +298,7 @@ function ColumnsSettings({ block, onChange, pages }: Props<ColumnsBlock>) {
           <option value="plain">Nur Text</option>
           <option value="list">Karten untereinander</option>
           <option value="timeline">Zeitlicher Verlauf</option>
+          <option value="stats">Kennzahlen</option>
         </select>
         <span>{block.items.length} Spalten</span>
         <button className="theta-button" disabled={block.items.length >= MAX_COLUMNS} onClick={() => onChange({ items: [...block.items, emptyColumn()] })}>
@@ -303,7 +313,8 @@ function ColumnsSettings({ block, onChange, pages }: Props<ColumnsBlock>) {
         <label>Link-Beschriftung<input value={block.linkLabel ?? ""} onChange={(e) => onChange({ linkLabel: e.target.value })} /></label>
         <LinkTarget id={`${block.id}-all`} label="Ziel des Überschrift-Links" value={block.href ?? ""} pages={pages} onChange={(href) => onChange({ href })} />
       </>}
-      {block.style !== "plain" &&
+      {block.style === "stats" && <p className="theta-note">Schreib die Zahl in den Titel, zum Beispiel „0 KB“, und darunter, was sie bedeutet.</p>}
+      {block.style !== "plain" && block.style !== "stats" &&
         block.items.map((item, i) => (
           <fieldset key={i} className="theta-card-settings">
             <legend>Karte {i + 1}</legend>

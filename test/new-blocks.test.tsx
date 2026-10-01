@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { type Block, type BlockType, ValidationError, newBlock, parseBlocks } from "../src/blocks";
+import { type Block, type BlockType, type HeroBlock, ValidationError, newBlock, parseBlocks } from "../src/blocks";
 import { BlockFlow, BlockView } from "../src/theme/blocks";
 import { videoSource } from "../src/theme/video";
 
@@ -113,6 +113,25 @@ describe("layout", () => {
     expect(render({ id: "i", type: "image", src: "/a.png", alt: "", caption: " ", width: "normal" })).not.toContain("figcaption");
   });
 
+  test("screenshots can sit in a browser frame; unknown frames fall back to none", () => {
+    const [framed, unknown] = parseBlocks([
+      { id: "i", type: "image", src: "/a.png", alt: "Editor", caption: "", width: "wide", frame: "browser" },
+      { id: "j", type: "image", src: "/a.png", alt: "Editor", caption: "", width: "wide", frame: "polaroid" },
+    ]);
+    expect(framed).toMatchObject({ frame: "browser" });
+    expect(unknown).toMatchObject({ frame: "none" });
+    expect(render(framed!)).toContain('<figure class="t-image t-width-wide"><div class="t-browser"><img');
+    expect(render(unknown!)).not.toContain("t-browser");
+  });
+
+  test("key figures are columns with the number as title", () => {
+    const [block] = parseBlocks([{ id: "c", type: "columns", style: "stats", items: [{ title: "0 KB", text: "JavaScript" }] }]);
+    expect(block).toMatchObject({ style: "stats" });
+    const html = render(block!);
+    expect(html).toContain('class="t-columns t-columns-stats"');
+    expect(html).toContain('<h3 class="t-column-title">0 KB</h3>');
+  });
+
   test("buttons that follow each other share a row", () => {
     const button = (id: string): Block => ({ id, type: "button", label: id, href: "/", variant: "primary" });
     const blocks: Block[] = [button("a"), button("b"), { id: "t", type: "text", text: "Hallo" }, button("c")];
@@ -161,6 +180,20 @@ describe("sections and hero", () => {
     expect(html).toContain('<a class="t-button t-button-primary" href="/speisekarte">Speisekarte</a>');
     expect(html).not.toContain("Ohne Ziel");
     expect(render({ id: "h", type: "hero", title: "Hallo", text: "", src: "", alt: "", buttons: [] })).toContain('class="t-hero t-band-accent"');
+  });
+
+  test("a hero without a picture can be centred on a soft glow, with a label and a highlight", () => {
+    const [hero] = parseBlocks([
+      { id: "h", type: "hero", title: "Deine Website. Von dir gepflegt.", text: "", src: "", alt: "", buttons: [], align: "center", tone: "glow", eyebrow: "Neu", highlight: "Von dir gepflegt." },
+    ]);
+    expect(hero).toMatchObject({ align: "center", tone: "glow" });
+    const html = render(hero!);
+    expect(html).toContain('class="t-hero t-hero-glow t-hero-center"');
+    expect(html).toContain('<p class="t-hero-eyebrow">Neu</p>');
+    expect(html).toContain('Deine Website. <strong class="t-highlight">Von dir gepflegt.</strong>');
+    // A picture always wins over the glow; unknown values fall back to the accent colour on the left.
+    expect(render({ ...(hero as HeroBlock), src: "/a.jpg" })).toContain('class="t-hero t-hero-image t-hero-center"');
+    expect(parseBlocks([{ id: "h", type: "hero", title: "", text: "", src: "", alt: "", buttons: [], align: "rechts", tone: "neon" }])[0]).toMatchObject({ align: "left", tone: "accent" });
   });
 
   test("headings after a hero are section headings", () => {

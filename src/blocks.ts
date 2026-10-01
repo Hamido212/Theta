@@ -13,13 +13,14 @@ export type TextBlock = { id: string; type: "text"; text: string };
 export type FocalPoint = { x: number; y: number };
 export type ImageContent = { src: string; alt: string; focal?: FocalPoint };
 export type ImageWidth = "normal" | "wide" | "full";
-export type ImageBlock = { id: string; type: "image"; src: string; alt: string; focal?: FocalPoint; caption: string; width: ImageWidth };
+// A browser frame suits screenshots of websites and apps.
+export type ImageBlock = { id: string; type: "image"; src: string; alt: string; focal?: FocalPoint; caption: string; width: ImageWidth; frame?: "none" | "browser" };
 // Galleries show 2 to 4 pictures per row, cropped to squares or in their own proportions.
 export type GalleryBlock = { id: string; type: "gallery"; images: ImageContent[]; columns: 2 | 3 | 4; crop: boolean };
 export type ButtonBlock = { id: string; type: "button"; label: string; href: string; variant: "primary" | "secondary" };
-// Columns use a text grid, picture cards, stacked cards or a dated timeline.
+// Columns use a text grid, picture cards, stacked cards, a dated timeline or key figures.
 export type Column = { focal?: FocalPoint; title: string; text: string; src: string; alt: string; href: string; linkLabel: string; meta?: string; tags?: string[] };
-export type ColumnsBlock = { id: string; type: "columns"; style: "plain" | "cards" | "list" | "timeline"; items: Column[]; heading?: string; href?: string; linkLabel?: string };
+export type ColumnsBlock = { id: string; type: "columns"; style: "plain" | "cards" | "list" | "timeline" | "stats"; items: Column[]; heading?: string; href?: string; linkLabel?: string };
 export type VideoBlock = { id: string; type: "video"; url: string; title: string };
 export type QuoteBlock = { id: string; type: "quote"; text: string; cite: string };
 export type DividerBlock = { id: string; type: "divider" };
@@ -29,8 +30,9 @@ export type SectionBlock = { id: string; type: "section"; background: SectionBac
 // References a centrally edited section; its draft is never rendered on live pages.
 export type SharedBlock = { id: string; type: "shared"; sectionId: string };
 // A full-width banner or compact profile, with title, text and up to two buttons.
+// Without a picture, a banner is filled with the accent colour or a soft glow of it.
 export type HeroButton = { label: string; href: string };
-export type HeroBlock = { id: string; type: "hero"; focal?: FocalPoint; title: string; text: string; src: string; alt: string; buttons: HeroButton[]; width?: "content" | "wide" | "full"; layout?: "banner" | "profile"; eyebrow?: string; highlight?: string; links?: HeroButton[] };
+export type HeroBlock = { id: string; type: "hero"; focal?: FocalPoint; title: string; text: string; src: string; alt: string; buttons: HeroButton[]; width?: "content" | "wide" | "full"; layout?: "banner" | "profile"; eyebrow?: string; highlight?: string; links?: HeroButton[]; align?: "left" | "center"; tone?: "accent" | "glow" };
 // A menu or price list: name and price on one line, an optional description below.
 export type PriceItem = { name: string; description: string; price: string };
 export type PricesBlock = { id: string; type: "prices"; items: PriceItem[] };
@@ -325,6 +327,7 @@ export function parseBlocks(input: unknown): Block[] {
           ...image(value, where),
           caption: value.caption === undefined ? "" : string(value.caption, `${where}.caption`, 500),
           width: value.width === "wide" || value.width === "full" ? value.width : "normal",
+          ...(value.frame !== undefined && { frame: value.frame === "browser" ? "browser" : "none" }),
         };
       case "gallery": {
         const images = list(value.images, `${where}.images`, MAX_GALLERY_IMAGES);
@@ -346,7 +349,7 @@ export function parseBlocks(input: unknown): Block[] {
           id,
           type: "columns",
           // Columns saved before cards existed stay plain.
-          style: value.style === "cards" || value.style === "list" || value.style === "timeline" ? value.style : "plain",
+          style: value.style === "cards" || value.style === "list" || value.style === "timeline" || value.style === "stats" ? value.style : "plain",
           ...(value.heading !== undefined && { heading: string(value.heading, `${where}.heading`, 200) }),
           ...(value.href !== undefined && { href: href(value.href, `${where}.href`) }),
           ...(value.linkLabel !== undefined && { linkLabel: string(value.linkLabel, `${where}.linkLabel`, 200) }),
@@ -402,6 +405,8 @@ export function parseBlocks(input: unknown): Block[] {
           ...(value.eyebrow !== undefined && { eyebrow: string(value.eyebrow, `${where}.eyebrow`, 200) }),
           ...(value.highlight !== undefined && { highlight: string(value.highlight, `${where}.highlight`, 200) }),
           ...(value.links !== undefined && { links: records(value.links, `${where}.links`, 8, (link, at) => ({ label: string(link.label, `${at}.label`, 200), href: href(link.href, `${at}.href`) })) }),
+          ...(value.align !== undefined && { align: value.align === "center" ? "center" : "left" }),
+          ...(value.tone !== undefined && { tone: value.tone === "glow" ? "glow" : "accent" }),
         };
       }
       case "prices":

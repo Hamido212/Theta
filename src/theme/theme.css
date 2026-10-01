@@ -155,6 +155,38 @@ body {
   border-radius: 0;
 }
 
+/* A browser window around screenshots: a slim title bar with three dots and a soft shadow. */
+.t-browser {
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--t-color-text) 12%, transparent);
+  border-radius: var(--t-radius);
+  background: color-mix(in srgb, var(--t-color-text) 4%, var(--t-color-bg));
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.06),
+    0 2rem 4rem -1.5rem color-mix(in srgb, var(--t-color-accent) 35%, rgb(0 0 0 / 0.3));
+}
+
+.t-browser::before {
+  --t-dot: color-mix(in srgb, var(--t-color-text) 22%, transparent);
+  content: "";
+  display: block;
+  height: 2rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--t-color-text) 10%, transparent);
+  background:
+    radial-gradient(circle, var(--t-dot) 0 4.5px, transparent 5px) 0.6rem 50% / 1.2rem 1.2rem no-repeat,
+    radial-gradient(circle, var(--t-dot) 0 4.5px, transparent 5px) 1.6rem 50% / 1.2rem 1.2rem no-repeat,
+    radial-gradient(circle, var(--t-dot) 0 4.5px, transparent 5px) 2.6rem 50% / 1.2rem 1.2rem no-repeat;
+}
+
+.t-image .t-browser img {
+  border-radius: 0;
+}
+
+.t-width-full .t-browser {
+  border-inline: 0;
+  border-radius: 0;
+}
+
 .t-width-full figcaption {
   padding-inline: var(--t-space);
 }
@@ -214,6 +246,11 @@ body {
   text-decoration-color: var(--t-color-accent);
   text-decoration-thickness: 2px;
   text-underline-offset: 6px;
+}
+
+/* A logo image has no text baseline, so the menu is centred next to it. */
+.t-header:has(.t-brand img) {
+  align-items: center;
 }
 
 .t-brand img {
@@ -441,6 +478,32 @@ a.t-column-link:hover {
   font-family: var(--t-font-heading);
   font-size: 1.3rem;
   line-height: 1.25;
+}
+
+/* Key figures: a big number in the accent colour, what it means below. */
+.t-columns-stats .t-column-title {
+  margin-bottom: 0.15em;
+  color: var(--t-color-accent);
+  font-size: clamp(2.2rem, 5vw, 3rem);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.t-columns-stats .t-text {
+  color: var(--t-color-muted);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 40rem) {
+  .t-columns-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .t-columns-stats .t-column-title {
+    font-size: 1.75rem;
+  }
 }
 
 .t-video {
@@ -960,6 +1023,77 @@ div.t-faq-item .t-faq-question {
 .t-hero .t-button-row {
   margin-top: calc(var(--t-space) * 0.25);
   text-shadow: none;
+}
+
+.t-hero-eyebrow {
+  margin: 0;
+  padding: 0.3em 0.9em;
+  border: 1px solid color-mix(in srgb, var(--t-color-accent) 30%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--t-color-accent) 10%, transparent);
+  color: var(--t-color-accent);
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.4;
+  text-shadow: none;
+}
+
+/* Without a picture: the page background with a soft glow of the accent colour and a
+   fine dot grid that fades out towards the edges. Both fade in below the header. */
+.t-hero-glow {
+  padding-block: calc(var(--t-space) * 3.5) calc(var(--t-space) * 3);
+}
+
+.t-hero-glow::before,
+.t-hero-glow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.t-hero-glow::before {
+  background:
+    radial-gradient(60% 70% at 50% 10%, color-mix(in srgb, var(--t-color-accent) 22%, transparent), transparent 70%),
+    radial-gradient(35% 45% at 88% 20%, color-mix(in srgb, var(--t-color-accent) 12%, transparent), transparent 70%),
+    radial-gradient(35% 45% at 12% 30%, color-mix(in srgb, var(--t-color-accent) 9%, transparent), transparent 70%);
+  mask-image: linear-gradient(to bottom, transparent, #000 6rem);
+}
+
+.t-hero-glow::after {
+  background-image: radial-gradient(color-mix(in srgb, var(--t-color-text) 16%, transparent) 1px, transparent 1.5px);
+  background-size: 1.5rem 1.5rem;
+  mask-image: radial-gradient(ellipse 70% 65% at 50% 35%, #000 20%, transparent 75%), linear-gradient(to bottom, transparent, #000 6rem);
+  mask-composite: intersect;
+}
+
+.t-hero-glow .t-hero-text {
+  color: color-mix(in srgb, var(--t-color-text) 75%, var(--t-color-bg));
+}
+
+.t-hero-center {
+  justify-items: center;
+  text-align: center;
+}
+
+.t-hero-center .t-hero-content {
+  justify-items: center;
+  max-width: 48rem;
+}
+
+.t-hero-center .t-hero-text {
+  max-width: 38rem;
+}
+
+.t-hero-center .t-button-row {
+  justify-content: center;
+}
+
+/* A framed screenshot right after a hero with a glow continues it. */
+.t-hero-glow + .t-image,
+.theta-block:has(> .t-hero-glow) + .theta-block > .t-image {
+  margin-top: calc(var(--t-space) * -1.5);
+  position: relative;
 }
 
 /* Controlled section variants, shared by editor, live pages and static export. */
