@@ -18,7 +18,7 @@ import {
   fontFaces,
 } from "../theme/tokens";
 import { pageTemplates } from "../templates";
-import type { SharedSectionData } from "../shared-sections";
+import { type LayoutRule, layoutPlaces, type SharedSectionData } from "../shared-sections";
 import type { MailSettings, Message } from "../contact";
 import type { Redirect } from "../redirects";
 
@@ -695,11 +695,12 @@ export function renderTrash({ user, pages, error }: { user: User; pages: Page[];
     </main></body></html>);
 }
 
-export function renderSharedSections({ user, sections, error }: { user: User; sections: SharedSectionData[]; error?: string }) {
+export function renderSharedSections({ user, sections, rules = [], error }: { user: User; sections: SharedSectionData[]; rules?: LayoutRule[]; error?: string }) {
   return html(<html lang="de"><AdminHead title="Gemeinsame Abschnitte" /><body>
     <AdminBar user={user} current="sections" />
     <main className="a-main"><h1>Gemeinsame Abschnitte</h1><ErrorMessage error={error} />
       <p>Einmal bearbeiten, auf mehreren Seiten verwenden. Gespeicherte Änderungen bleiben Entwürfe. Erst „Veröffentlichen“ übernimmt sie auf allen eingebundenen Seiten.</p>
+      <p className="a-muted">Mit „Automatisch zeigen“ erscheint ein Abschnitt ohne Einbinden zum Beispiel unter jedem Blogbeitrag. Seiten, die ihn schon selbst einbinden, zeigen ihn nur einmal.</p>
       <form method="post" action="/admin/shared-sections" className="a-form">
         <label>Name<input name="title" required maxLength={200} placeholder="Zum Beispiel: Projektanfrage" /></label>
         <button>Gemeinsamen Abschnitt anlegen</button>
@@ -707,6 +708,14 @@ export function renderSharedSections({ user, sections, error }: { user: User; se
       <ul className="a-list">{sections.map(({ page, usage }) => <li key={page.slug}>
         <div className="a-grow"><a href={editPath(page.slug)}><strong>{page.title}</strong></a><p className="a-muted">{page.publishedAt ? page.hasChanges ? "Live-Fassung vorhanden · Änderungen im Entwurf" : "Veröffentlicht" : "Entwurf"} · {usage.length} {usage.length === 1 ? "Einbindung" : "Einbindungen"}</p>
           {usage.length > 0 && <ul>{usage.map((item) => <li key={item.slug}><a href={item.href}>{item.title}</a></li>)}</ul>}
+          <form method="post" action={`/admin/shared-sections/${page.slug}/rule`} className="a-inline">
+            <label>Automatisch zeigen<select name="place" defaultValue={rules.find((rule) => rule.sectionId === page.slug)?.place ?? ""}>
+              <option value="">Nur wo ich ihn einbinde</option>
+              {Object.entries(layoutPlaces).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select></label>
+            <button>Übernehmen</button>
+          </form>
+          {rules.some((rule) => rule.sectionId === page.slug) && !page.publishedAt && <p className="a-muted">Erscheint automatisch, sobald der Abschnitt veröffentlicht ist.</p>}
         </div>
         <a className="a-link" href={editPath(page.slug)}>Bearbeiten</a>
         <form method="post" action={`/admin/shared-sections/${page.slug}/delete`}><input type="hidden" name="version" value={page.version} /><button disabled={usage.length > 0} title={usage.length ? "Zuerst die Einbindungen entfernen oder in Kopien umwandeln" : "In den Papierkorb verschieben"}>In den Papierkorb</button></form>

@@ -26,9 +26,12 @@ export type QuoteBlock = { id: string; type: "quote"; text: string; cite: string
 export type DividerBlock = { id: string; type: "divider" };
 // Starts a new full-width band of the page. Everything up to the next section shares its background.
 export type SectionBackground = "plain" | "soft" | "accent" | "inverse";
-export type SectionBlock = { id: string; type: "section"; background: SectionBackground; width?: "content" | "wide" | "full"; spacing?: "compact" | "normal" | "spacious"; align?: "left" | "center" };
+// In a shared section, props lists the blocks every embedding page may fill with its own text or picture.
+export type SectionBlock = { id: string; type: "section"; background: SectionBackground; width?: "content" | "wide" | "full"; spacing?: "compact" | "normal" | "spacious"; align?: "left" | "center"; props?: string[] };
 // References a centrally edited section; its draft is never rendered on live pages.
-export type SharedBlock = { id: string; type: "shared"; sectionId: string };
+// overrides holds this page's own values for the section's props, keyed by block id.
+export type PropValues = Partial<Record<PropField, string>>;
+export type SharedBlock = { id: string; type: "shared"; sectionId: string; overrides?: Record<string, PropValues> };
 // A full-width banner or compact profile, with title, text and up to two buttons.
 // Without a picture, a banner is filled with the accent colour or a soft glow of it.
 export type HeroButton = { label: string; href: string };
@@ -50,8 +53,10 @@ export type TeamBlock = { id: string; type: "team"; members: TeamMember[] };
 export type FormBlock = { id: string; type: "form"; button: string; success: string; phone: boolean };
 // A place on an OpenStreetMap map that only loads when a visitor clicks. lat/lon are null until a place is chosen.
 export type MapBlock = { id: string; type: "map"; lat: number | null; lon: number | null; zoom: number; label: string; width: ImageWidth };
+// The newest published blog posts, kept up to date automatically.
+export type PostsBlock = { id: string; type: "posts"; count: number; style: "cards" | "list" };
 
-export type Block =
+type AnyBlock =
   | HeadingBlock
   | TextBlock
   | ImageBlock
@@ -69,8 +74,21 @@ export type Block =
   | FormBlock
   | MapBlock
   | HoursBlock
-  | TeamBlock;
+  | TeamBlock
+  | PostsBlock;
+// Hidden blocks stay in the draft and the editor but never reach visitors.
+export type Block = AnyBlock & { hidden?: boolean };
 export type BlockType = Block["type"];
+
+// What a shared section may let each page change: words, links and pictures, never the layout.
+export type PropField = "text" | "label" | "href" | "cite" | "src" | "alt" | "caption";
+export const PROP_FIELDS: Partial<Record<BlockType, PropField[]>> = {
+  heading: ["text"],
+  text: ["text"],
+  image: ["src", "alt", "caption"],
+  button: ["label", "href"],
+  quote: ["text", "cite"],
+};
 
 export type PageKind = "page" | "post" | "section";
 
@@ -158,6 +176,7 @@ export const blockLabels: Record<BlockType, string> = {
   team: "Team",
   form: "Kontaktformular",
   map: "Karte",
+  posts: "Neueste Beiträge",
 };
 
 export const sectionBackgrounds: Record<SectionBackground, string> = {
@@ -222,6 +241,8 @@ export function newBlock(type: BlockType, id: string = crypto.randomUUID()): Blo
       return { id, type, button: "Nachricht senden", success: "Danke für deine Nachricht! Wir melden uns bald.", phone: false };
     case "map":
       return { id, type, lat: null, lon: null, zoom: 16, label: "", width: "normal" };
+    case "posts":
+      return { id, type, count: 3, style: "cards" };
   }
 }
 
@@ -282,6 +303,8 @@ function friendly(message: string, index: number, type: unknown): string {
 }
 
 const MAX_BLOCKS = 500;
+export const MAX_POSTS = 12;
+const PROP_FIELD_NAMES: PropField[] = ["text", "label", "href", "cite", "src", "alt", "caption"];
 const MAX_TEXT = 20_000;
 
 // Validates untrusted input (e.g. a request body) and returns clean blocks.
@@ -295,7 +318,8 @@ export function parseBlocks(input: unknown): Block[] {
   let hasTitle = false;
   return input.map((raw, index): Block => {
     try {
-      return parseBlock(raw, index);
+      const block = parseBlock(raw, index);
+      return (raw as { hidden?: unknown }).hidden === true ? { ...block, hidden: true } : block;
     } catch (err) {
       if (!(err instanceof ValidationError)) throw err;
       throw new ValidationError(friendly(err.message, index, (raw as { type?: unknown } | null)?.type), index);
@@ -385,11 +409,25 @@ export function parseBlocks(input: unknown): Block[] {
           ...(value.width !== undefined && { width: value.width === "wide" || value.width === "full" ? value.width : "content" }),
           ...(value.spacing !== undefined && { spacing: value.spacing === "compact" || value.spacing === "spacious" ? value.spacing : "normal" }),
           ...(value.align !== undefined && { align: value.align === "center" ? "center" : "left" }),
+          ...(value.props !== undefined && { props: list(value.props, `${where}.props`, MAX_BLOCKS).map((item, i) => string(item, `${where}.props[${i}]`, 100)) }),
         };
       case "shared": {
         const sectionId = string(value.sectionId, `${where}.sectionId`, 100);
         if (!/^[a-z0-9-]+$/.test(sectionId)) throw new ValidationError(`${where}: Bitte einen gemeinsamen Abschnitt auswählen`);
-        return { id, type: "shared", sectionId };
+        if (value.overrides === undefined) return { id, type: "shared", sectionId };
+        const overrides = object(value.overrides, `${where}.overrides`);
+        if (Object.keys(overrides).length > MAX_BLOCKS) throw new ValidationError(`${where}: zu viele eigene Inhalte`);
+        return { id, type: "shared", sectionId, overrides: Object.fromEntries(Object.entries(overrides).map(([target, raw]) => {
+          const fields = object(raw, `${where}.overrides`);
+          const values: PropValues = {};
+          for (const field of PROP_FIELD_NAMES) {
+            if (fields[field] === undefined) continue;
+            values[field] = field === "src" ? image({ src: fields.src, alt: "" }, where).src
+              : field === "href" ? href(fields.href, `${where}.href`)
+              : string(fields[field], `${where}.${field}`, field === "text" ? MAX_TEXT : 2_000);
+          }
+          return [string(target, `${where}.overrides`, 100), values];
+        })) };
       }
       case "hero": {
         // The hero's title is the page title.
@@ -465,6 +503,13 @@ export function parseBlocks(input: unknown): Block[] {
           width: value.width === "wide" || value.width === "full" ? value.width : "normal",
         };
       }
+      case "posts":
+        return {
+          id,
+          type: "posts",
+          count: Number.isInteger(value.count) && (value.count as number) >= 1 && (value.count as number) <= MAX_POSTS ? (value.count as number) : 3,
+          style: value.style === "list" ? "list" : "cards",
+        };
       case "form":
         return {
           id,

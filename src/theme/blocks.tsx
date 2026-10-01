@@ -25,6 +25,7 @@ import { SocialIcon } from "./icons";
 import { ContactForm } from "./form";
 import { LanguageContext } from "./language";
 import { mapLink, mapPlaceholder } from "./map";
+import { LatestPosts } from "./posts";
 
 // The default theme. Every block component renders on the server (edit is undefined)
 // and inside the editor (edit updates the block), so both views look identical.
@@ -524,5 +525,7 @@ export function BlockView({ block, edit }: BlockProps<Block>) {
       return <ContactForm block={block} edit={e} />;
     case "map":
       return <PlaceMap block={block} edit={e} />;
+    case "posts":
+      return <LatestPosts block={block} edit={e} />;
   }
 }
