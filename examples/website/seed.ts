@@ -64,7 +64,7 @@ const comparison = [
 
 const steps = [
   column("Herunterladen", `Lade die ZIP-Datei für dein System von der [Download-Seite auf GitHub](${RELEASES}): Windows, macOS mit Apple-Chip oder Linux.`, { meta: "Schritt 1" }),
-  column("Entpacken und starten", "Entpacke die ZIP und starte „theta“ mit einem Doppelklick. Der Browser öffnet sich mit der Einrichtung. Das kleine Fenster daneben zeigt, dass Theta läuft.", { meta: "Schritt 2" }),
+  column("Entpacken und starten", "Entpacke die ZIP und starte „theta“ mit einem Doppelklick, unter Linux im Terminal mit „./theta“. Der Browser öffnet sich mit der Einrichtung. Das kleine Fenster daneben zeigt, dass Theta läuft.", { meta: "Schritt 2" }),
   column("Konto anlegen und schreiben", "Lege dein Konto an. Danach landest du direkt im Editor, klickst auf einen Text und schreibst los.", { meta: "Schritt 3" }),
   column("Online stellen", "Lade die Website unter „Übersicht“ als HTML herunter und lade sie bei deinem Webhoster hoch. Oder betreibe Theta auf einem Server, dann funktionieren auch Kontaktformulare.", { meta: "Schritt 4" }),
 ];
@@ -141,8 +141,9 @@ export async function seedWebsite({ db, pages, settings, media }: { db: Database
     section("plain"),
     heading("Häufige Fragen"),
     faq([
-      { question: "Mein Mac sagt, das Programm stammt von einem unbekannten Entwickler.", answer: "Theta ist noch nicht bei Apple signiert. Klicke mit der rechten Maustaste auf „theta“, wähle „Öffnen“ und bestätige. Das ist nur beim ersten Start nötig." },
+      { question: "Mein Mac lässt Theta nicht starten.", answer: "Theta ist noch nicht bei Apple signiert, deshalb blockiert macOS den ersten Start. Öffne Systemeinstellungen → Datenschutz & Sicherheit und klicke unten bei „theta“ auf „Trotzdem öffnen“. Wer das Terminal kennt, gibt den ganzen Ordner auf einmal frei. Wie das geht, steht in der „LIESMICH.txt“ in der ZIP." },
       { question: "Windows zeigt eine SmartScreen-Warnung.", answer: "Klicke auf „Weitere Informationen“ und dann auf „Trotzdem ausführen“. Auch hier fehlt noch eine Signatur." },
+      { question: "Ich habe mein Passwort vergessen.", answer: "Öffne im Ordner von Theta ein Terminal und gib „./theta reset-password deine@adresse.de“ ein, unter Windows „.\\\\theta.exe reset-password deine@adresse.de“. Theta zeigt dann ein neues Passwort an." },
       { question: "Wo liegen meine Daten?", answer: "Im Ordner „theta-daten“ neben dem Programm. Unter „Übersicht“ lädst du jederzeit eine Sicherung herunter. Auf einem neuen Rechner spielst du sie gleich bei der Einrichtung ein." },
       { question: "Wie kommt meine Website ins Internet?", answer: "Unter „Übersicht“ lädst du die Website als ZIP mit fertigen HTML-Dateien herunter. Die lädst du bei deinem Webhoster hoch. Kontaktformulare brauchen dagegen einen laufenden Theta-Server." },
     ]),

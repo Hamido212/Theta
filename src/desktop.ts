@@ -1,5 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { commands, runCommand } from "./commands";
 import { startServer } from "./server";
 
 // The single-file program (scripts/build.ts). Its data lives in the folder "theta-daten" next
@@ -7,6 +8,13 @@ import { startServer } from "./server";
 
 process.env.THETA_DB ??= join(dirname(process.execPath), "theta-daten", "theta.db");
 mkdirSync(dirname(process.env.THETA_DB), { recursive: true });
+
+// Started from a terminal with a maintenance command, e.g. ./theta reset-password you@example.com:
+// run it on the same data instead of the website. Anything else starts Theta as usual.
+const [word, ...rest] = process.argv.slice(2);
+if (word && commands.includes(word.toLowerCase())) {
+  process.exit(await runCommand([word.toLowerCase(), ...rest], process.platform === "win32" ? ".\\theta.exe" : "./theta"));
+}
 
 let url: URL | undefined;
 const fixedPort = process.env.PORT !== undefined;

@@ -18,7 +18,7 @@ Noch nicht enthalten sind Plugins und mehrsprachige Seiten. Wer Tausende Seiten 
 
 ## Ausprobieren
 
-**Ohne Terminal:** Lade unter [Releases](https://github.com/Hamido212/Theta/releases) die ZIP für dein System herunter (Windows, macOS mit Apple-Chip, Linux), entpacke sie und starte `theta` mit einem Doppelklick. Der Browser öffnet sich mit der Einrichtung. Deine Daten liegen im Ordner `theta-daten` neben dem Programm. Auf dem Mac bestätigst du den ersten Start mit Rechtsklick und „Öffnen“, unter Windows bei SmartScreen mit „Weitere Informationen“ und „Trotzdem ausführen“, weil das Programm noch nicht signiert ist.
+**Ohne Terminal:** Lade unter [Releases](https://github.com/Hamido212/Theta/releases) die ZIP für dein System herunter (Windows, macOS mit Apple-Chip, Linux), entpacke sie und starte `theta` mit einem Doppelklick (unter Linux im Terminal mit `./theta`). Der Browser öffnet sich mit der Einrichtung. Deine Daten liegen im Ordner `theta-daten` neben dem Programm. Weil das Programm noch nicht signiert ist, blockiert macOS den ersten Start: Gib ihn unter Systemeinstellungen → Datenschutz & Sicherheit mit „Trotzdem öffnen“ frei oder entferne die Sperre für den ganzen Ordner einmal im Terminal mit `xattr -dr com.apple.quarantine <Ordner>`. Unter Windows klickst du bei SmartScreen auf „Weitere Informationen“ und „Trotzdem ausführen“. Die `LIESMICH.txt` in der ZIP erklärt das für dein System.
 
 **Auf einem Server mit Docker:**
 
@@ -52,7 +52,7 @@ Unter `/admin/shared-sections` legst du **gemeinsame Abschnitte** an, etwa eine 
 
 **Veröffentlichen in der zentralen Bearbeitung aktualisiert alle eingebundenen öffentlichen Seiten und Beiträge sofort.** Bloßes Speichern bleibt privat. Die Verwaltung zeigt die verwendenden Seiten; ein noch verwendeter Abschnitt lässt sich weder löschen noch zurückziehen. „In unabhängige Kopie umwandeln“ löst eine Einbindung auf Basis ihrer veröffentlichten Fassung; veröffentliche danach die Seite, um auch die Live-Einbindung zu entfernen. Geschützte Seitenvorschauen und der HTML-Export verwenden ebenfalls die veröffentlichte zentrale Fassung. Die Vorschau des zentralen Abschnitts selbst zeigt seinen gespeicherten Entwurf.
 
-Passwort vergessen? `bun run theta reset-password deine@adresse.de` setzt ein neues, zufälliges Passwort und zeigt es an.
+Passwort vergessen? `bun run theta reset-password deine@adresse.de` setzt ein neues, zufälliges Passwort und zeigt es an. Im heruntergeladenen Programm heißt der Befehl `./theta reset-password deine@adresse.de` (Windows: `.\theta.exe reset-password …`), mit Docker `docker exec <Container> bun src/cli.ts reset-password deine@adresse.de`. Genauso gibt es `backup`, `restore` und `export`; `hilfe` zeigt alle Befehle.
 
 ## Beispiel: seid.dev in Theta
 
