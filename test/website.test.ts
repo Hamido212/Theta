@@ -19,6 +19,7 @@ test("the Theta website seeds, renders and exports without JavaScript", async ()
     expect(html).toContain(`href="/${imprintPage.slug}"`);
   }
   expect(await (await site.app.request(`/${imprintPage.slug}`)).text()).toContain("Osterstr. 14");
+  expect(await (await site.app.request(`/${privacyPage.slug}`)).text()).toContain("Vercel Inc.");
 
   const files = await exportSite(site, "https://theta.example");
   const home = new TextDecoder().decode(files.get("index.html"));

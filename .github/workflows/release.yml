@@ -32,13 +32,17 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
       - run: bun run build
-      # The program must start (which loads the image library) and serve the editor.
+      # The program must start (which loads the image library) and serve the editor. Its test
+      # data stays outside dist/theta, so the download does not ship a database.
       - name: Smoke test
         run: |
-          THETA_OPEN=0 PORT=3999 ./dist/theta/${{ matrix.exe }} > theta.log 2>&1 &
+          THETA_OPEN=0 PORT=3999 THETA_DB="$RUNNER_TEMP/theta-smoke/theta.db" ./dist/theta/${{ matrix.exe }} > theta.log 2>&1 &
+          program=$!
           for i in $(seq 1 30); do curl -sf http://127.0.0.1:3999/ >/dev/null && break; sleep 1; done
           curl -sf http://127.0.0.1:3999/ >/dev/null
           curl -sf http://127.0.0.1:3999/assets/editor.js >/dev/null
+          kill "$program" || true
+          test ! -e dist/theta/theta-daten
       - name: Package
         run: |
           cd dist
@@ -57,11 +61,15 @@ jobs:
     needs: program
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           merge-multiple: true
+      # The release text comes from docs/releases/<tag>.md, written before the tag is set.
       - uses: softprops/action-gh-release@v2
         with:
+          name: Theta ${{ github.ref_name }}
+          body_path: docs/releases/${{ github.ref_name }}.md
           files: theta-*.zip
 
   docker:

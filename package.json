@@ -1,7 +1,8 @@
 {
   "name": "theta",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "description": "Theta: ein einfaches, modernes CMS",
   "scripts": {

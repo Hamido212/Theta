@@ -81,6 +81,7 @@ if (!target) {
   cpSync(join(modules, "sharp", "LICENSE"), join(out, "node_modules", "sharp-LICENSE.txt"));
 }
 
+cpSync(join(root, "LICENSE"), join(out, "LICENSE.txt"));
 writeFileSync(
   join(out, "LIESMICH.txt"),
   `Theta
@@ -94,6 +95,7 @@ Verwaltung lädst du jederzeit eine Sicherung herunter, mit der du auf einen and
 umziehen kannst.
 
 Den Ordner "node_modules" braucht Theta für Bilder. Bitte nicht löschen.
+Theta steht unter der MIT-Lizenz, siehe LICENSE.txt.
 
 macOS: Beim ersten Start mit Rechtsklick auf "theta" und "Öffnen" bestätigen.
 Windows: Erscheint ein Hinweis von SmartScreen, auf "Weitere Informationen" und "Trotzdem ausführen" klicken.
