@@ -19,7 +19,15 @@ Im Editor klickst du auf einen Text und schreibst los. Mit der Formatierungsleis
 
 Links wechselst du zwischen Seiten und Abschnitten, in der Mitte bearbeitest du die Website, rechts erscheinen die Einstellungen des ausgewählten Blocks. Auf kleinen Bildschirmen blendest du die Seiten- oder Einstellungsleiste mit den Knöpfen oben ein. Über das „+“ an der Unterkante eines Blocks fügst du direkt dahinter einen neuen Block ein. Am Griff ⠿ ziehst du Blöcke an eine andere Stelle, mit ⧉ verdoppelst du sie. Lässt sich eine Seite nicht speichern, markiert Theta den betroffenen Block und sagt, was fehlt. Hat eine andere Sitzung die Seite geändert, stoppt Theta das Speichern und behält deinen lokalen Text im geöffneten Editor. Prüfe und kopiere ihn bei Bedarf, bevor du ausdrücklich den Serverstand lädst.
 
+Der Speicherstatus berücksichtigt auch Text, den du während einer laufenden Speicherung eingibst. Nach vier Sekunden erklärt Theta eine langsame Antwort; nach 15 Sekunden endet eine unbeantwortete Anfrage mit einem Hinweis zum erneuten Speichern. Eine verspätete Antwort bestätigt keinen neueren Entwurf. Wenn der Server die Änderung bereits übernommen hat, aber seine Antwort verloren ging, schützt die Versionsprüfung beim nächsten Versuch den Serverstand.
+
 Unter „Fertige Abschnitte“ fügst du ganze Bausteine auf einmal ein: Angebot in Karten, Über uns, Aufruf, Stimmen, Bildergalerie, Preise, Team, Häufige Fragen oder Kontakt. Ein ausgewählter Abschnitt wird samt Inhalt bis zum nächsten Abschnitt verschoben, verdoppelt oder gelöscht. Seine Breite, Abstände und Ausrichtung wählst du aus festen Vorgaben. Über „Als Vorlage behalten“ speicherst du ihn für weitere Seiten; jede Verwendung erzeugt eine unabhängige Kopie. Auch neue Seiten können mit einer Vorlage starten (Startseite, Über uns, Preise oder Speisekarte, Angebot, Kontakt), damit sie nicht leer beginnen.
+
+Die Abschnittsauswahl hat eine Suche und die Kategorien „Agentur“, „Allgemein“ und „Eigene Vorlagen“. Für Agenturen gibt es sieben zusammenpassende Abschnitte für Einstieg, Leistungen, Projekte, Ablauf, Vorstellung, FAQ und Kontakt sowie vier vollständige Seitenvorlagen. Sie enthalten bearbeitbare Strukturen; Projektbilder, Beschreibungen und Kontaktziele ergänzt du selbst. Beim Titelbild wählst du Textbreite, breite Inhalte oder die ganze Fensterbreite. Titelbild und Abschnitte verwenden dieselben Seitenabstände, auch auf dem Handy.
+
+Unter `/admin/shared-sections` legst du **gemeinsame Abschnitte** an, etwa eine Projektanfrage für mehrere Seiten. Alternativ wählst du einen vorhandenen Abschnitt und nutzt „Als gemeinsamen Abschnitt anlegen“. Er startet als eigener Entwurf mit Verlauf und Versionsprüfung. Öffne „Zentral bearbeiten“ und veröffentliche ihn, bevor du eine Seite mit seiner Einbindung veröffentlichst. Danach findest du ihn in der Blockauswahl unter „Gemeinsame Abschnitte“.
+
+**Veröffentlichen in der zentralen Bearbeitung aktualisiert alle eingebundenen öffentlichen Seiten und Beiträge sofort.** Bloßes Speichern bleibt privat. Die Verwaltung zeigt die verwendenden Seiten; ein noch verwendeter Abschnitt lässt sich weder löschen noch zurückziehen. „In unabhängige Kopie umwandeln“ löst eine Einbindung auf Basis ihrer veröffentlichten Fassung; veröffentliche danach die Seite, um auch die Live-Einbindung zu entfernen. Geschützte Seitenvorschauen und der HTML-Export verwenden ebenfalls die veröffentlichte zentrale Fassung. Die Vorschau des zentralen Abschnitts selbst zeigt seinen gespeicherten Entwurf.
 
 Passwort vergessen? `bun run theta reset-password deine@adresse.de` setzt ein neues, zufälliges Passwort und zeigt es an.
 
@@ -59,6 +67,7 @@ Das Titelbild hat außerdem die Darstellung **Profil mit Porträt** mit Kurzbeze
 | `src/richtext.ts` | Das Textformat für fett, kursiv, Links und Listen |
 | `src/db.ts` | SQLite-Datenbank und Schema-Migrationen |
 | `src/store.ts` | Speicherung der Seiten, Blog-Beiträge und Einstellungen |
+| `src/shared-sections.ts` | Prüfung gemeinsamer Abschnitte und Auflösung ihrer veröffentlichten Einbindungen |
 | `src/auth.ts` | Konten, Passwörter und Anmeldungen |
 | `src/media.ts` | Hochgeladene Bilder: Prüfung, Optimierung, kleinere Versionen |
 | `src/export.ts`, `src/zip.ts` | Export der Website als statische Dateien bzw. ZIP |
@@ -94,3 +103,7 @@ bun run typecheck  # Typprüfung
 Beim Start aktualisiert Theta ältere Datenbanken automatisch. Bereits öffentliche Seiten und Blogbeiträge bleiben veröffentlicht; bisherige Beitragsentwürfe bleiben privat. Sichere vor einem Update die gestoppte Datenbank samt Uploads.
 
 Die Speicher-API `PUT /api/pages/:slug` erwartet die zuletzt gelesene numerische `version` und optional `action: "save" | "publish" | "unpublish"` (Standard: `save`). Eine erfolgreiche Antwort enthält die neue Version. Ein veralteter Stand liefert HTTP 409 und verändert keine Inhalte. Die Startseite bleibt veröffentlicht. Der Vergleich mit EmDash und die Umsetzungsliste stehen in [docs/emdash-vergleich.md](docs/emdash-vergleich.md) und [docs/umsetzung-editor.md](docs/umsetzung-editor.md).
+
+Gemeinsame Abschnitte sind intern Seiten mit `kind: "section"`, eigener Live-Fassung und Verlauf. `GET /api/shared-sections` liefert angemeldeten Nutzern Entwürfe, veröffentlichte Blöcke und Verwendungen; `POST /api/shared-sections` legt aus `{ title, blocks }` einen Entwurf an. Die Bearbeitung verwendet dieselbe Speicher-API. Einbindungen speichern `{ id, type: "shared", sectionId }`. Ein zentraler Abschnitt enthält genau einen Abschnittsmarker mit Inhalt, ohne weitere Abschnitte, Einbindungen, Titelbilder oder H1. Die Datenbank braucht dafür keine neue Migration. Gemeinsame Abschnitte erscheinen nicht als eigene öffentliche Seiten, im Menü oder in der Sitemap. Alle API-Schreibzugriffe weisen einen vorhandenen fremden `Origin` zurück; hinter einem Proxy muss `THETA_URL` die öffentliche Adresse enthalten.
+
+Aufgaben und Prüfungen aus dem HYOS-Praxistest stehen in [docs/hyos-editor-aufgaben.md](docs/hyos-editor-aufgaben.md).

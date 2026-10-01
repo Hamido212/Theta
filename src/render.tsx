@@ -5,6 +5,7 @@ import { BLOG, HOME, type NavItem, type Page, type SiteSettings, excerpt, format
 import { BlockFlow, BlockView } from "./theme/blocks";
 import { type ImageLookup, Img, ImageLookupContext } from "./theme/image";
 import { SiteFrame } from "./theme/layout";
+import { expandSharedSections, type SharedSectionData, type SharedSections } from "./shared-sections";
 
 // What every page needs to know about the site around it.
 export type SiteContext = {
@@ -18,6 +19,7 @@ export type SiteContext = {
   images?: ImageLookup;
   // The site's design tokens as CSS (see src/theme/tokens.ts).
   themeCss?: string;
+  sharedSections?: SharedSections;
 };
 
 // Data the browser editor starts with.
@@ -29,6 +31,7 @@ export type EditorData = {
   // All pages, offered as link targets.
   pages: NavItem[];
   templates?: SavedSectionTemplate[];
+  sharedSections?: SharedSectionData[];
 };
 
 type DocumentProps = { title: string; language?: "de" | "en"; themeCss?: string; icon?: string; head?: ReactNode; children: ReactNode };
@@ -103,7 +106,8 @@ function PostDate({ page, language }: { page: Page; language?: "de" | "en" }) {
 }
 
 // Public page: plain HTML and CSS, no JavaScript at all.
-export function renderPage(page: Page, { site, nav, legal = [], origin, images = () => null, themeCss }: SiteContext): string {
+export function renderPage(page: Page, { site, nav, legal = [], origin, images = () => null, themeCss, sharedSections }: SiteContext): string {
+  page = { ...page, blocks: expandSharedSections(page.blocks, sharedSections) };
   const post = page.kind === "post";
   return html(
     <Document

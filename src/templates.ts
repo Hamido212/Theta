@@ -19,7 +19,13 @@ const strip = <T extends Block>(block: T): Draft => {
   return rest as Draft;
 };
 
-export type SectionTemplate = { id: string; label: string; hint: string; blocks: () => Block[] };
+export type SectionTemplate = { id: string; label: string; hint: string; category?: "general" | "agency" | "custom"; blocks: () => Block[] };
+
+const agencySection = (background: SectionBackground): Draft => ({ type: "section", background, width: "wide" });
+const agencyColumns = (titles: string[], style: "cards" | "plain" = "cards"): Draft => ({
+  type: "columns", style,
+  items: titles.map((title) => ({ title, text: "", src: "", alt: "", href: "", linkLabel: "Mehr erfahren" })),
+});
 
 const sections = {
   offer: {
@@ -71,6 +77,34 @@ const sections = {
       ...contactDetails(),
     ],
   },
+  "agency-intro": {
+    label: "Agentur · Einstieg", hint: "Ein breiter Einstieg mit zwei Kontaktmöglichkeiten",
+    drafts: () => [agencySection("accent"), heading("Gute Ideen verdienen einen guten Auftritt."), text(), button("Projekt besprechen"), { ...button("Leistungen ansehen"), variant: "secondary" } as Draft],
+  },
+  "agency-services": {
+    label: "Agentur · Leistungen", hint: "Drei Leistungen mit Beschreibung, optionalem Bild und Link",
+    drafts: () => [agencySection("soft"), heading("Was wir für dich bauen."), agencyColumns(["Websites & Gestaltung", "Individuelle Anwendungen", "Technische Begleitung"])],
+  },
+  "agency-work": {
+    label: "Agentur · Arbeitsbeispiele", hint: "Drei Projektkarten für deine eigenen Arbeiten und Bilder",
+    drafts: () => [agencySection("plain"), heading("Ausgewählte Projekte"), agencyColumns(["Projekt 1", "Projekt 2", "Projekt 3"])],
+  },
+  "agency-process": {
+    label: "Agentur · Ablauf", hint: "Vier Schritte, die auf dem Handy untereinander stehen",
+    drafts: () => [agencySection("plain"), heading("Ein klarer Weg zum Ergebnis."), agencyColumns(["01 · Verstehen", "02 · Gestalten", "03 · Entwickeln", "04 · Begleiten"], "plain")],
+  },
+  "agency-about": {
+    label: "Agentur · Vorstellung", hint: "Ein kontrastreicher Abschnitt für dein Team und deine Arbeitsweise",
+    drafts: () => [agencySection("inverse"), heading("Die Menschen hinter den Ideen."), text(), { ...strip(newBlock("image")), width: "normal" } as Draft],
+  },
+  "agency-faq": {
+    label: "Agentur · Fragen", hint: "Typische Fragen zu Einstieg, Umfang und Weiterentwicklung; Antworten selbst ergänzen",
+    drafts: () => [agencySection("plain"), heading("Häufige Fragen"), { type: "faq", items: ["Wie beginnt die Zusammenarbeit?", "Was kostet ein Projekt?", "Kann ich Inhalte selbst pflegen?", "Was passiert nach dem Start?"].map((question) => ({ question, answer: "" })) } as Draft],
+  },
+  "agency-contact": {
+    label: "Agentur · Kontaktaufruf", hint: "Ein farbiger Abschluss mit deinem Kontaktlink",
+    drafts: () => [agencySection("accent"), heading("Deine Idee ist der Anfang."), text(), button("Projekt besprechen")],
+  },
 } satisfies Record<string, { label: string; hint: string; drafts: () => Draft[] }>;
 
 export type SectionTemplateId = keyof typeof sections;
@@ -79,6 +113,7 @@ export const sectionTemplates: SectionTemplate[] = Object.entries(sections).map(
   id,
   label,
   hint,
+  category: id.startsWith("agency-") ? "agency" : "general",
   blocks: () => withIds(drafts()),
 }));
 
@@ -86,8 +121,8 @@ export const sectionTemplates: SectionTemplate[] = Object.entries(sections).map(
 // after it into that band. So the band that was running there continues after the template.
 export function insertTemplate(list: Block[], at: number, template: Block[]): Block[] {
   const after = list.slice(at);
-  const opensBand = template[0]?.type === "section";
-  if (opensBand && after.length > 0 && after[0]!.type !== "section") {
+  const opensBand = template[0]?.type === "section" || template[0]?.type === "shared";
+  if (opensBand && after.length > 0 && after[0]!.type !== "section" && after[0]!.type !== "shared") {
     const running = list.slice(0, at).findLast((block) => block.type === "section");
     const continuation = running?.type === "section" ? running : { type: "section" as const, background: "plain" as const };
     template = [...template, { ...continuation, id: crypto.randomUUID() }];
@@ -128,6 +163,27 @@ const pages = {
     label: "Kontakt",
     drafts: (title: string) => [heading(title, 1), ...contactDetails()],
   },
+  agency: {
+    label: "Agentur · Startseite",
+    drafts: (title: string) => [
+      { type: "hero", title, text: "", src: "", alt: "", width: "wide", buttons: [{ label: "Projekt besprechen", href: "" }, { label: "Leistungen ansehen", href: "" }] } as Draft,
+      ...sections["agency-services"].drafts(), ...sections["agency-work"].drafts(),
+      ...sections["agency-process"].drafts(), ...sections["agency-about"].drafts(),
+      ...sections["agency-faq"].drafts(), ...sections["agency-contact"].drafts(),
+    ],
+  },
+  "agency-services": {
+    label: "Agentur · Leistungen",
+    drafts: (title: string) => [heading(title, 1), text(), ...sections["agency-services"].drafts(), ...sections["agency-faq"].drafts(), ...sections["agency-contact"].drafts()],
+  },
+  "agency-process": {
+    label: "Agentur · Zusammenarbeit",
+    drafts: (title: string) => [heading(title, 1), text(), ...sections["agency-process"].drafts(), heading("Zum Start gehört eine gute Übergabe."), text(), ...sections["agency-contact"].drafts()],
+  },
+  "agency-contact": {
+    label: "Agentur · Kontakt",
+    drafts: (title: string) => [heading(title, 1), text(), button("E-Mail schreiben"), agencySection("soft"), heading("Ein paar Zeilen reichen."), agencyColumns(["Dein Vorhaben", "Dein Zeitplan", "Dein Rahmen"], "plain")],
+  },
 } satisfies Record<string, { label: string; drafts: (title: string) => Draft[] }>;
 
 export type PageTemplateId = keyof typeof pages;
@@ -139,3 +195,9 @@ export const isPageTemplate = (id: unknown): id is PageTemplateId => typeof id =
 export const pageBlocks = (template: PageTemplateId, title: string): Block[] => withIds(pages[template].drafts(title));
 
 export type SavedSectionTemplate = { id: string; title: string; blocks: Block[] };
+
+export function findTemplates(templates: SectionTemplate[], search: string, category = "all"): SectionTemplate[] {
+  const query = search.toLocaleLowerCase("de").trim();
+  return templates.filter((template) => (category === "all" || (template.category ?? "general") === category) &&
+    `${template.label} ${template.hint}`.toLocaleLowerCase("de").includes(query));
+}

@@ -64,6 +64,52 @@ test("a failed network save can be retried with the same version", async () => {
   expect((await writer.save(() => ({ ...page, title: "Neu" }))).version).toBe(2);
 });
 
+test("a stalled save releases the queue, aborts and ignores its late confirmation", async () => {
+  let finish!: (response: Response) => void;
+  let signal: AbortSignal | undefined;
+  let calls = 0;
+  const writer = new DraftWriter(page, async (_, init) => {
+    calls++; signal = init.signal as AbortSignal;
+    if (calls === 1) return new Promise<Response>((resolve) => { finish = resolve; });
+    return Response.json({ ...page, title: "Neu", version: 2 });
+  }, 15);
+  const before = writer.savedKey;
+  const saving = writer.save(() => ({ ...page, title: "Alt und unbestätigt" }));
+  const queued = writer.save(() => ({ ...page, title: "Neu" }), "publish");
+  const results = await Promise.allSettled([saving, queued]);
+  expect(results.every((result) => result.status === "rejected")).toBe(true);
+  expect(signal!.aborted).toBe(true);
+  expect(writer.savedKey).toBe(before);
+  finish(Response.json({ ...page, title: "Alt und unbestätigt", version: 99 }));
+  await Promise.resolve(); await Promise.resolve();
+  expect(writer.page.version).toBe(1);
+  expect((await writer.save(() => ({ ...page, title: "Neu" }))).version).toBe(2);
+});
+
+test("a stalled response body cannot leave saving pending forever", async () => {
+  const res = new Response(new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode('{"slug":')); } }));
+  const writer = new DraftWriter(page, async () => res, 15);
+  await expect(writer.save(() => ({ ...page, title: "Neu" }))).rejects.toThrow("nicht geantwortet");
+  expect(writer.page).toEqual(page);
+  expect(writer.savedKey).toBe(new DraftWriter(page).savedKey);
+});
+
+test("retrying an unconfirmed committed write preserves version conflict protection", async () => {
+  const site = await testSite({ login: true });
+  const original = site.pages.create("Timeout-Test");
+  let calls = 0;
+  const writer = new DraftWriter(original, async (url, init) => {
+    const response = await site.request(url, init);
+    if (++calls === 1) return new Promise<Response>(() => {});
+    return response;
+  }, 150);
+  await expect(writer.save(() => ({ ...original, title: "Vom Server angenommen" }))).rejects.toThrow("nicht geantwortet");
+  expect(site.pages.get(original.slug)!.title).toBe("Vom Server angenommen");
+  await expect(writer.save(() => ({ ...original, title: "Weitere lokale Eingabe" }))).rejects.toThrow("inzwischen geändert");
+  expect(writer.conflict).toBe(true);
+  expect(site.pages.get(original.slug)!.title).toBe("Vom Server angenommen");
+});
+
 test("restoring history preserves autosaved and unsaved drafts without changing the live copy", async () => {
   const { pages, request } = await testSite({ login: true });
   const created = pages.create("Ursprünglich", "Test");
@@ -202,6 +248,18 @@ test("layout choices and focal points survive validation and shared rendering", 
   for (const focal of [{ x: -0.1, y: 0.5 }, { x: 0.5, y: 1.1 }, { x: Infinity, y: 0 }, { x: "0.5", y: 0.5 }]) {
     expect(() => parseBlocks([{ id: "i", type: "image", src: "", alt: "", focal }])).toThrow();
   }
+});
+
+test("content after a shared section keeps the live band's style and its editor index", () => {
+  const blocks: Block[] = [
+    { id: "band", type: "section", background: "inverse", width: "wide", spacing: "compact", align: "center" },
+    { id: "before", type: "text", text: "Vorher" },
+    { id: "reference", type: "shared", sectionId: "contact" },
+    { id: "after", type: "text", text: "Nachher" },
+  ];
+  const html = renderToStaticMarkup(<BlockFlow blocks={blocks}>{(block, index) => <span data-block={block.id} data-index={index} />}</BlockFlow>);
+  expect(html).toContain('<div class="t-band t-band-inverse t-band-width-wide t-band-spacing-compact t-band-align-center"><span data-block="after" data-index="3"></span></div>');
+  expect(html).not.toContain('data-block="reference" data-index="2"></span><span data-block="after"');
 });
 
 test("own section templates validate groups, require login and insert independent copies", async () => {

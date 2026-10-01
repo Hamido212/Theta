@@ -14,7 +14,7 @@ export class DraftWriter {
   conflict = false;
   private pending: Promise<Page> | null = null;
 
-  constructor(page: Page, private request: (url: string, init: RequestInit) => Promise<Response> = (url, init) => fetch(url, init)) {
+  constructor(page: Page, private request: (url: string, init: RequestInit) => Promise<Response> = (url, init) => fetch(url, init), private timeoutMs = 15_000) {
     this.page = page;
     this.savedKey = draftKey(page);
   }
@@ -49,11 +49,24 @@ export class DraftWriter {
   }
 
   private async write(draft: Draft, key: string, action: SaveAction, autosave: boolean): Promise<Page> {
-    const res = await this.request(`/api/pages/${encodeURIComponent(this.page.slug)}`, {
-      method: "PUT", headers: { "content-type": "application/json" },
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // Bound both the request and reading its body. A late response must never
+    // confirm a timed-out write or mutate the version used by the next request.
+    const response = this.request(`/api/pages/${encodeURIComponent(this.page.slug)}`, {
+      method: "PUT", headers: { "content-type": "application/json" }, signal: controller.signal,
       body: JSON.stringify({ ...draft, version: this.page.version, action, autosave }),
+    }).then(async (res) => ({ res, data: await res.json().catch(() => null) }));
+    const deadline = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        reject(new SaveError("Der Server hat nach 15 Sekunden nicht geantwortet. Dein Text bleibt hier erhalten. Prüfe deine Verbindung und speichere erneut; bei einem Versionskonflikt lade den Serverstand."));
+        controller.abort();
+      }, this.timeoutMs);
     });
-    const data = await res.json().catch(() => null);
+    let result: Awaited<typeof response>;
+    try { result = await Promise.race([response, deadline]); }
+    finally { clearTimeout(timer); }
+    const { res, data } = result;
     if (!res.ok) {
       this.conflict = res.status === 409;
       throw new SaveError(data?.error ?? "Speichern nicht möglich. Prüfe deine Verbindung und versuche es erneut.", this.conflict, data?.block);

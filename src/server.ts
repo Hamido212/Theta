@@ -4,7 +4,7 @@ import { type Context, Hono, type MiddlewareHandler } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { bodyLimit } from "hono/body-limit";
 import { csrf } from "hono/csrf";
-import { renderBlog, renderDashboard, renderDesign, renderLogin, renderMediaLibrary, renderSetup, renderSetupLocked, renderTrash } from "./admin/pages";
+import { renderBlog, renderDashboard, renderDesign, renderLogin, renderMediaLibrary, renderSetup, renderSetupLocked, renderTrash, renderSharedSections } from "./admin/pages";
 import { AuthError, AuthStore, type User } from "./auth";
 import { BLOG, HOME, type NavItem, ValidationError, editPath, pagePath, parseBlocks } from "./blocks";
 import { openDatabase } from "./db";
@@ -71,10 +71,23 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
     origin: publicUrl ? new URL(publicUrl).origin : new URL(c.req.url).origin,
     images: (src) => media.info(src),
     themeCss: themeCss(settings.theme()),
+    sharedSections: Object.fromEntries(pages.sharedSections().flatMap((section) => {
+      const live = pages.live(section.slug);
+      return live ? [[section.slug, live.blocks]] : [];
+    })),
   });
 
   // Rejects form posts from other sites, so nobody can act in the name of a logged-in user.
   app.use(csrf(publicUrl ? { origin: new URL(publicUrl).origin } : undefined));
+  // Hono's form CSRF check skips application/json. Explicitly reject foreign
+  // origins on authenticated API writes as well, including requests from proxies.
+  app.use("/api/*", async (c, next) => {
+    const origin = c.req.header("origin");
+    if (!/^(GET|HEAD|OPTIONS)$/.test(c.req.method) && origin && origin !== new URL(publicUrl ?? c.req.url).origin) {
+      return c.json({ error: "Diese Änderung muss von deiner Theta-Website ausgehen." }, 403);
+    }
+    await next();
+  });
 
   const currentUser = (c: Context<Env>) => {
     const token = getCookie(c, SESSION_COOKIE);
@@ -193,6 +206,7 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
   app.use("/admin/*", requireUser);
   app.use("/api/*", requireUser);
 
+  const sharedData = () => pages.sharedSections().map((page) => ({ page, liveBlocks: pages.live(page.slug)?.blocks ?? null, usage: pages.sharedUsage(page.slug) }));
   const editor = (c: Context<Env>, slug: string) => {
     const page = pages.get(slug);
     if (!page) return c.html(renderNotFound(siteContext(c)), 404);
@@ -203,7 +217,7 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
       ...(posts.some((post) => post.publishedAt) ? [{ slug: BLOG, title: "Blog", href: `/${BLOG}` }] : []),
       ...posts.map((post) => ({ slug: post.slug, title: post.title, href: pagePath(post) })),
     ];
-    return c.html(renderEditor({ page, site: settings.site(), nav: pages.nav(settings.site()), legal: pages.legal(settings.site()), pages: targets, templates: settings.templates() }, themeCss(settings.theme())));
+    return c.html(renderEditor({ page, site: settings.site(), nav: pages.nav(settings.site()), legal: pages.legal(settings.site()), pages: targets, templates: settings.templates(), sharedSections: sharedData() }, themeCss(settings.theme())));
   };
   app.get("/edit", (c) => editor(c, HOME));
   app.get(`/edit/${HOME}`, (c) => c.redirect("/edit"));
@@ -317,6 +331,42 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
   app.delete("/api/section-templates/:id", (c) => {
     settings.deleteTemplate(c.req.param("id"));
     return c.json({ ok: true });
+  });
+
+  app.get("/api/shared-sections", (c) => c.json(sharedData()));
+  app.post("/api/shared-sections", bodyLimit({ maxSize: 2_000_000 }), async (c) => {
+    const body = await c.req.json().catch(() => null);
+    try {
+      if (!body || typeof body !== "object" || Array.isArray(body)) throw new ValidationError("Ungültiger Abschnitt");
+      const page = pages.createShared(body.title, body.blocks, c.get("user").name);
+      return c.json({ page, liveBlocks: null, usage: [] }, 201);
+    } catch (err) {
+      if (err instanceof ValidationError) return c.json({ error: err.message, block: err.block }, 400);
+      throw err;
+    }
+  });
+  const sharedAdmin = (c: Context<Env>, error?: string) => c.html(renderSharedSections({ user: c.get("user"), sections: sharedData(), error }), error ? 400 : 200);
+  app.get("/admin/shared-sections", (c) => sharedAdmin(c));
+  app.post("/admin/shared-sections", async (c) => {
+    const form = await c.req.parseBody();
+    try {
+      const page = pages.createShared(form.title, [{ id: crypto.randomUUID(), type: "section", background: "accent", width: "wide" }, { id: crypto.randomUUID(), type: "heading", text: String(form.title ?? ""), level: 2 }, { id: crypto.randomUUID(), type: "text", text: "" }], c.get("user").name);
+      return c.redirect(editPath(page.slug));
+    } catch (err) {
+      if (err instanceof ValidationError) return sharedAdmin(c, err.message);
+      throw err;
+    }
+  });
+  app.post("/admin/shared-sections/:slug/delete", async (c) => {
+    const form = await c.req.parseBody();
+    try {
+      if (pages.get(c.req.param("slug"))?.kind !== "section") throw new ValidationError("Gemeinsamer Abschnitt nicht gefunden");
+      pages.delete(c.req.param("slug"), parseVersion(Number(form.version)));
+      return c.redirect("/admin/shared-sections");
+    } catch (err) {
+      if (err instanceof ValidationError || err instanceof ConflictError) return sharedAdmin(c, err.message);
+      throw err;
+    }
   });
 
   // Media library

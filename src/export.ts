@@ -23,6 +23,10 @@ export async function exportSite({ pages, settings, media }: Stores, origin: str
     origin,
     images: (src) => media.info(src),
     themeCss: themeCss(settings.theme()),
+    sharedSections: Object.fromEntries(pages.sharedSections().flatMap((section) => {
+      const live = pages.live(section.slug);
+      return live ? [[section.slug, live.blocks]] : [];
+    })),
   };
 
   for (const page of all) {

@@ -230,7 +230,7 @@ function Hero({ block, edit }: BlockProps<HeroBlock>) {
     </div>;
   }
   return (
-    <div className={block.src ? "t-hero t-hero-image" : "t-hero t-band-accent"}>
+    <div className={`${block.src ? "t-hero t-hero-image" : "t-hero t-band-accent"}${block.width ? ` t-band-width-${block.width}` : ""}`}>
       {block.src && <Img src={block.src} alt={block.alt} focal={block.focal} sizes="100vw" eager />}
       <div className="t-hero-content">
         <h1 className="t-hero-title">
@@ -399,18 +399,27 @@ type FlowProps = { blocks: Block[]; children: (block: Block, index: number) => R
 // everything up to the next section. Buttons that follow each other share one row,
 // so "Book now" and "Menu" sit side by side instead of stacking.
 export function BlockFlow({ blocks, children }: FlowProps) {
-  const bands: { start: number; blocks: Block[] }[] = [{ start: 0, blocks: [] }];
+  const bands: { start: number; blocks: Block[]; continuation?: SectionBlock }[] = [{ start: 0, blocks: [] }];
+  let running: SectionBlock | undefined;
   blocks.forEach((block, index) => {
-    if (block.type === "section") bands.push({ start: index, blocks: [block] });
+    if (block.type === "section") { running = block; bands.push({ start: index, blocks: [block] }); }
+    else if (block.type === "shared") {
+      bands.push({ start: index, blocks: [block] }, {
+        start: index + 1, blocks: [],
+        continuation: running ?? { id: `${block.id}-continuation`, type: "section", background: "plain" },
+      });
+    }
     else bands.at(-1)!.blocks.push(block);
   });
   return (
     <>
-      {bands.map(({ start, blocks: band }) => {
+      {bands.map(({ start, blocks: band, continuation }) => {
         const first = band[0];
-        if (first?.type !== "section") return <Runs key="start" blocks={band} start={start} children={children} />;
+        if (!first) return null;
+        const section = first.type === "section" ? first : continuation;
+        if (!section) return <Runs key={first.id} blocks={band} start={start} children={children} />;
         return (
-          <div key={first.id} className={`t-band t-band-${first.background} t-band-width-${first.width ?? "content"} t-band-spacing-${first.spacing ?? "normal"} t-band-align-${first.align ?? "left"}`}>
+          <div key={first.id} className={`t-band t-band-${section.background} t-band-width-${section.width ?? "content"} t-band-spacing-${section.spacing ?? "normal"} t-band-align-${section.align ?? "left"}`}>
             <Runs blocks={band} start={start} children={children} />
           </div>
         );
@@ -465,6 +474,8 @@ export function BlockView({ block, edit }: BlockProps<Block>) {
       return <hr className="t-divider" />;
     case "section":
       return <Section block={block} edit={e} />;
+    case "shared":
+      return null; // Resolved on the server; the editor supplies a labelled preview.
     case "hero":
       return <Hero block={block} edit={e} />;
     case "prices":
