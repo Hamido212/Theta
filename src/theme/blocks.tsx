@@ -68,9 +68,10 @@ const imageSizes = {
 
 function Image({ block, edit }: BlockProps<ImageBlock>) {
   if (!block.src) return edit ? <Empty>Noch kein Bild ausgewählt</Empty> : null;
+  const picture = <Img src={block.src} alt={block.alt} focal={block.focal} sizes={imageSizes[block.width]} />;
   return (
     <figure className={`t-image t-width-${block.width}`}>
-      <Img src={block.src} alt={block.alt} focal={block.focal} sizes={imageSizes[block.width]} />
+      {block.frame === "browser" ? <div className="t-browser">{picture}</div> : picture}
       {(edit || block.caption.trim()) && (
         <figcaption>
           <TextField value={block.caption} onChange={edit && ((caption) => edit({ caption }))} placeholder="Bildunterschrift (optional)" />
@@ -256,12 +257,18 @@ function Hero({ block, edit }: BlockProps<HeroBlock>) {
       </div>
     </div>;
   }
+  const background = block.src ? "t-hero-image" : block.tone === "glow" ? "t-hero-glow" : "t-band-accent";
   return (
-    <div className={`${block.src ? "t-hero t-hero-image" : "t-hero t-band-accent"}${block.width ? ` t-band-width-${block.width}` : ""}`}>
+    <div className={`t-hero ${background}${block.align === "center" ? " t-hero-center" : ""}${block.width ? ` t-band-width-${block.width}` : ""}`}>
       {block.src && <Img src={block.src} alt={block.alt} focal={block.focal} sizes="100vw" eager />}
       <div className="t-hero-content">
+        {(block.eyebrow || (edit && block.eyebrow !== undefined)) && (
+          <p className="t-hero-eyebrow">
+            <TextField value={block.eyebrow ?? ""} onChange={edit && ((eyebrow) => edit({ eyebrow }))} placeholder="Kurzbezeichnung" />
+          </p>
+        )}
         <h1 className="t-hero-title">
-          <TextField value={block.title} onChange={edit && ((title) => edit({ title }))} placeholder="Titel der Seite" />
+          <TextField value={block.title} highlight={block.highlight} onChange={edit && ((title) => edit({ title }))} placeholder="Titel der Seite" />
         </h1>
         {(edit || block.text.trim()) && (
           <div className="t-hero-text">

@@ -1,6 +1,6 @@
 # Die Theta-Website, gebaut mit Theta
 
-Die Website zu Theta selbst: Startseite mit den drei Versprechen, ein ehrlicher Vergleich mit Hugo, Astro und EmDash und eine Download-Seite. Sie besteht nur aus normalen Theta-Seiten und Blöcken, kommt ohne JavaScript aus und dient zugleich als Testwebsite.
+Die Website zu Theta selbst: eine Startseite nach dem Vorbild von Astro und EmDash mit zentriertem Titel, Editor-Bild, Kennzahlen, Ablauf, Funktionen und häufigen Fragen, dazu ein ehrlicher Vergleich mit Hugo, Astro und EmDash, eine Download-Seite, Impressum und Datenschutz. Sie besteht nur aus normalen Theta-Seiten und Blöcken, kommt ohne JavaScript aus und dient zugleich als Testwebsite.
 
 ![Startseite der Theta-Website](preview.webp)
 
@@ -25,6 +25,7 @@ schreibt die veröffentlichte Website nach `examples/website/export/`. Die Adres
 
 ## Vor dem Veröffentlichen
 
-- Ein **Impressum** und eine **Datenschutzerklärung** fehlen bewusst, weil sie echte Angaben brauchen. Lege beide Seiten im Editor an und wähle sie unter `/admin` aus.
+- **Impressum** und **Datenschutz** enthalten die Angaben von Hamid Yosefsei (wie auf hyos.tech). Die Datenschutzerklärung ist ein knapper Entwurf für eine Website ohne Cookies, Formular und fremde Dienste; prüfe sie, bevor die Website online geht, und ergänze den Webhoster.
 - Die Download-Seite verlinkt auf [GitHub Releases](https://github.com/Hamido212/Theta/releases). Dort erscheinen die Programme, sobald ein Tag wie `v0.1.0` den Release-Workflow startet.
 - Die Angaben zu Hugo, Astro und EmDash haben den Stand 1. Oktober 2026.
+- Das Editor-Bild liegt in `docs/theta-editor.webp` und zeigt den Editor mit dieser Startseite. Das Logo ist `media/theta-logo.svg`; es passt sich hellen und dunklen Geräten an.
