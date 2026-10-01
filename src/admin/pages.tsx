@@ -63,9 +63,10 @@ function ErrorMessage({ error }: { error?: string }) {
 
 const html = (node: ReactNode) => "<!doctype html>" + renderToStaticMarkup(node);
 
-export function renderLogin({ error, email = "", next = "/admin" }: { error?: string; email?: string; next?: string }) {
+export function renderLogin({ error, notice, email = "", next = "/admin" }: { error?: string; notice?: string; email?: string; next?: string }) {
   return html(
     <AdminDocument title="Anmelden">
+      {notice && <p className="a-notice">{notice}</p>}
       <ErrorMessage error={error} />
       <form method="post" action="/login" className="a-form">
         <input type="hidden" name="next" value={next} />
@@ -83,7 +84,9 @@ export function renderLogin({ error, email = "", next = "/admin" }: { error?: st
   );
 }
 
-export function renderSetup({ token, error, name = "", email = "" }: { token: string; error?: string; name?: string; email?: string }) {
+type SetupProps = { token: string; error?: string; name?: string; email?: string; restore?: boolean; restoreError?: string };
+
+export function renderSetup({ token, error, name = "", email = "", restore = false, restoreError }: SetupProps) {
   return html(
     <AdminDocument title="Theta einrichten">
       <p>Lege das Konto an, mit dem du deine Website bearbeitest.</p>
@@ -108,6 +111,24 @@ export function renderSetup({ token, error, name = "", email = "" }: { token: st
         </label>
         <button type="submit">Konto anlegen</button>
       </form>
+      {restore && (
+        <section className="a-setup-restore">
+          <h2>Umzug von einem anderen Rechner?</h2>
+          <p className="a-muted">
+            Hast du eine Theta-Sicherung, spielst du sie hier ein, statt ein neues Konto anzulegen. Danach meldest du dich mit
+            deinem bisherigen Konto an.
+          </p>
+          <ErrorMessage error={restoreError} />
+          <form method="post" action="/setup/restore" encType="multipart/form-data" className="a-form">
+            <input type="hidden" name="token" value={token} />
+            <label>
+              Sicherung (.zip)
+              <input name="file" type="file" accept=".zip,application/zip" required />
+            </label>
+            <button type="submit">Sicherung einspielen</button>
+          </form>
+        </section>
+      )}
     </AdminDocument>,
   );
 }
@@ -168,6 +189,8 @@ type DashboardProps = {
   unread?: number;
   hasForm?: boolean;
   redirects?: Redirect[];
+  // Whether complete backups can be downloaded and restored.
+  backups?: boolean;
 };
 
 function PageChoice({ name, label, value, pages }: { name: string; label: string; value: string; pages: Page[] }) {
@@ -188,7 +211,7 @@ function PageChoice({ name, label, value, pages }: { name: string; label: string
   );
 }
 
-export function renderDashboard({ user, pages, site, media, origin, error, unread = 0, hasForm = false, redirects = [] }: DashboardProps) {
+export function renderDashboard({ user, pages, site, media, origin, error, unread = 0, hasForm = false, redirects = [], backups = false }: DashboardProps) {
   const movable = pages.filter((page) => page.slug !== HOME);
   return html(
     <html lang="de">
@@ -388,6 +411,39 @@ export function renderDashboard({ user, pages, site, media, origin, error, unrea
               </p>
             )}
           </section>
+
+          {backups && (
+            <section className="a-section">
+              <h2>Sichern und umziehen</h2>
+              <p className="a-muted">
+                Die Sicherung enthält alles, was zu deiner Website gehört: Seiten mit Entwürfen und Verlauf, Papierkorb, Bilder,
+                Design, Vorlagen, Nachrichten und Konten. Damit holst du die Website nach einem Fehler zurück oder ziehst auf einen
+                anderen Rechner um. Bewahre die Datei sicher auf, denn sie enthält auch Nachrichten von Besuchern und ein
+                eingetragenes E-Mail-Passwort.
+              </p>
+              <form method="post" action="/admin/backup">
+                <button className="a-primary">Sicherung herunterladen</button>
+              </form>
+              <details className="a-delete a-restore">
+                <summary>Sicherung einspielen</summary>
+                <p className="a-warning">
+                  Die Sicherung ersetzt die ganze Website. Theta legt vorher eine Sicherung des jetzigen Stands im Ordner
+                  „sicherungen“ neben der Datenbank ab. Danach meldest du dich mit einem Konto aus der Sicherung an.
+                </p>
+                <form method="post" action="/admin/restore" encType="multipart/form-data" className="a-form">
+                  <label>
+                    Sicherung (.zip)
+                    <input name="file" type="file" accept=".zip,application/zip" required />
+                  </label>
+                  <label className="a-confirm">
+                    <input name="confirm" type="checkbox" value="ja" required />
+                    Ich möchte die aktuelle Website durch diese Sicherung ersetzen.
+                  </label>
+                  <button className="a-danger">Sicherung einspielen</button>
+                </form>
+              </details>
+            </section>
+          )}
         </main>
       </body>
     </html>,

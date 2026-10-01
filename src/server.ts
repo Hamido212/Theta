@@ -6,6 +6,7 @@ import { bodyLimit } from "hono/body-limit";
 import { csrf } from "hono/csrf";
 import { renderBlog, renderDashboard, renderDesign, renderLogin, renderMediaLibrary, renderMessages, renderSetup, renderSetupLocked, renderTrash, renderSharedSections } from "./admin/pages";
 import { AuthError, AuthStore, type User } from "./auth";
+import { BackupError, Backups, MAX_BACKUP_BYTES, backupName } from "./backup";
 import { BLOG, type FormBlock, HOME, type NavItem, type Page, ValidationError, editPath, pagePath, parseBlocks, publicPath } from "./blocks";
 import { ContactStore, RateLimit, parseSubmission } from "./contact";
 import { type Geocoder, nominatim } from "./geocode";
@@ -65,12 +66,23 @@ export type AppOptions = {
   contact?: ContactStore;
   // Address search for the map block; OpenStreetMap's Nominatim unless replaced (tests).
   geocoder?: Geocoder;
+  // Download and restore of complete backups. Without it, the backup section is hidden.
+  backups?: Backups;
 };
 
 type Env = { Variables: { user: User } };
 
-export function createApp({ pages, settings, media, auth, setupToken, publicUrl, contact, geocoder = nominatim() }: AppOptions) {
+export function createApp({ pages, settings, media, auth, setupToken, publicUrl, contact, geocoder = nominatim(), backups }: AppOptions) {
   const app = new Hono<Env>();
+
+  // Requests stay below 128 MB, except restoring a backup, which carries all images of a site.
+  const restorePaths = new Set(["/admin/restore", "/setup/restore"]);
+  const requestLimit = bodyLimit({ maxSize: 128 * 1024 * 1024 });
+  const backupLimit = bodyLimit({
+    maxSize: MAX_BACKUP_BYTES,
+    onError: (c) => c.text("Die Sicherung ist zu groß (höchstens 1 GB).", 413),
+  });
+  app.use((c, next) => (restorePaths.has(c.req.path) ? backupLimit(c, next) : requestLimit(c, next)));
 
   const siteContext = (c: Context<Env>): SiteContext => ({
     site: settings.site(),
@@ -217,7 +229,8 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl,
     const next = safeNext(c.req.query("next"));
     if (!auth.hasUsers()) return c.redirect("/setup");
     if (currentUser(c)) return c.redirect(next);
-    return c.html(renderLogin({ next }));
+    const notice = c.req.query("wiederhergestellt") !== undefined ? "Die Sicherung wurde eingespielt. Melde dich mit einem Konto aus der Sicherung an." : undefined;
+    return c.html(renderLogin({ next, notice }));
   });
 
   app.post("/login", async (c) => {
@@ -246,7 +259,22 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl,
     if (auth.hasUsers()) return c.redirect("/login");
     const token = c.req.query("token");
     if (!setupAllowed(token)) return c.html(renderSetupLocked(), 403);
-    return c.html(renderSetup({ token: token! }));
+    return c.html(renderSetup({ token: token!, restore: backups !== undefined }));
+  });
+
+  // Moving to a new computer: a fresh Theta can start from a backup instead of a new account.
+  app.post("/setup/restore", async (c) => {
+    if (auth.hasUsers() || !backups) return c.redirect("/login");
+    const form = await c.req.parseBody();
+    if (!setupAllowed(form.token)) return c.html(renderSetupLocked(), 403);
+    try {
+      backups.restore(await backupFile(form.file));
+    } catch (err) {
+      if (err instanceof BackupError) return c.html(renderSetup({ token: String(form.token), restore: true, restoreError: err.message }), 400);
+      throw err;
+    }
+    if (!auth.hasUsers()) return c.redirect("/setup");
+    return c.redirect("/login?wiederhergestellt");
   });
 
   app.post("/setup", async (c) => {
@@ -255,7 +283,7 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl,
     if (!setupAllowed(form.token)) return c.html(renderSetupLocked(), 403);
 
     const input = { name: String(form.name ?? ""), email: String(form.email ?? ""), password: String(form.password ?? "") };
-    const retry = (error: string) => c.html(renderSetup({ token: String(form.token), error, name: input.name, email: input.email }), 400);
+    const retry = (error: string) => c.html(renderSetup({ token: String(form.token), error, name: input.name, email: input.email, restore: backups !== undefined }), 400);
     if (input.password !== String(form.password2 ?? "")) return retry("Die Passwörter stimmen nicht überein.");
     try {
       startSession(c, await auth.createUser(input));
@@ -308,6 +336,7 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl,
         unread: contact?.unread(),
         hasForm: hasLiveForm(c),
         redirects: pages.redirects.list(),
+        backups: backups !== undefined,
       }),
       error ? 400 : 200,
     );
@@ -646,6 +675,33 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl,
     });
   });
 
+  // A complete backup: database and uploaded images, to keep safe or to move the site.
+  app.post("/admin/backup", (c) => {
+    if (!backups) return c.notFound();
+    return new Response(backups.create(), {
+      headers: {
+        "content-type": "application/zip",
+        "content-disposition": `attachment; filename="${backupName(slugify(settings.site().name))}"`,
+      },
+    });
+  });
+
+  // Replaces the whole site with a backup. Sessions are not part of a backup, so everybody
+  // signs in again, with the accounts from the backup.
+  app.post("/admin/restore", async (c) => {
+    if (!backups) return c.notFound();
+    const form = await c.req.parseBody();
+    if (form.confirm !== "ja") return dashboard(c, "Bitte bestätige, dass die Sicherung die aktuelle Website ersetzt.");
+    try {
+      backups.restore(await backupFile(form.file));
+    } catch (err) {
+      if (err instanceof BackupError) return dashboard(c, err.message);
+      throw err;
+    }
+    deleteCookie(c, SESSION_COOKIE, { path: "/" });
+    return c.redirect(auth.hasUsers() ? "/login?wiederhergestellt" : "/setup");
+  });
+
   app.post("/admin/site", async (c) => {
     const form = await c.req.parseBody();
     try {
@@ -771,6 +827,11 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl,
   return app;
 }
 
+async function backupFile(value: unknown): Promise<Uint8Array> {
+  if (!(value instanceof File) || value.size === 0) throw new BackupError("Bitte eine Sicherungsdatei (.zip) auswählen.");
+  return new Uint8Array(await value.arrayBuffer());
+}
+
 // Only allow redirects to paths on this site.
 function safeNext(value: unknown): string {
   return typeof value === "string" && value.startsWith("/") && !value.startsWith("//") && !value.includes("\\")
@@ -787,15 +848,18 @@ function safeEqual(a: string, b: string): boolean {
 if (import.meta.main) {
   const dbPath = process.env.THETA_DB ?? "theta.db";
   const db = openDatabase(dbPath);
-  const media = new MediaStore(db, process.env.THETA_UPLOADS ?? join(dirname(dbPath), "uploads"));
+  const uploads = process.env.THETA_UPLOADS ?? join(dirname(dbPath), "uploads");
+  const media = new MediaStore(db, uploads);
   const auth = new AuthStore(db);
+  const backups = new Backups(db, uploads, join(dirname(dbPath), "sicherungen"));
   const publicUrl = process.env.THETA_URL;
   const setupToken = auth.hasUsers() ? undefined : Buffer.from(crypto.getRandomValues(new Uint8Array(18))).toString("base64url");
 
   const server = Bun.serve({
     hostname: process.env.THETA_HOST ?? "127.0.0.1",
     port: Number(process.env.PORT ?? 3000),
-    fetch: createApp({ pages: new PageStore(db), settings: new SettingsStore(db), media, auth, setupToken, publicUrl, contact: new ContactStore(db) }).fetch,
+    maxRequestBodySize: MAX_BACKUP_BYTES,
+    fetch: createApp({ pages: new PageStore(db), settings: new SettingsStore(db), media, auth, setupToken, publicUrl, contact: new ContactStore(db), backups }).fetch,
   });
 
   const base = publicUrl ?? server.url;

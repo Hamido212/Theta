@@ -4,7 +4,7 @@ import { Database } from "bun:sqlite";
 
 // Each entry upgrades the schema by one version. Never edit an entry that has shipped;
 // append a new one instead. PRAGMA user_version records how many have run.
-const migrations: string[] = [
+export const migrations: string[] = [
   `CREATE TABLE IF NOT EXISTS pages (
      slug       TEXT PRIMARY KEY,
      title      TEXT NOT NULL,
