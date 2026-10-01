@@ -19,6 +19,7 @@ import {
 } from "../theme/tokens";
 import { pageTemplates } from "../templates";
 import type { SharedSectionData } from "../shared-sections";
+import type { MailSettings, Message } from "../contact";
 
 // Server-rendered admin screens. They work without JavaScript: plain forms that post back.
 
@@ -121,7 +122,7 @@ export function renderSetupLocked() {
   );
 }
 
-function AdminBar({ user, current }: { user: User; current: "pages" | "blog" | "media" | "design" | "sections" }) {
+function AdminBar({ user, current }: { user: User; current: "pages" | "blog" | "media" | "design" | "sections" | "messages" }) {
   return (
     <header className="a-bar">
       <strong>θ Theta</strong>
@@ -134,6 +135,9 @@ function AdminBar({ user, current }: { user: User; current: "pages" | "blog" | "
         </a>
         <a href="/admin/media" aria-current={current === "media" ? "page" : undefined}>
           Mediathek
+        </a>
+        <a href="/admin/messages" aria-current={current === "messages" ? "page" : undefined}>
+          Nachrichten
         </a>
         <a href="/admin/trash">Papierkorb</a>
         <a href="/admin/shared-sections" aria-current={current === "sections" ? "page" : undefined}>Gemeinsame Abschnitte</a>
@@ -152,7 +156,17 @@ function AdminBar({ user, current }: { user: User; current: "pages" | "blog" | "
   );
 }
 
-type DashboardProps = { user: User; pages: Page[]; site: SiteSettings; media: MediaItem[]; origin: string; error?: string };
+type DashboardProps = {
+  user: User;
+  pages: Page[];
+  site: SiteSettings;
+  media: MediaItem[];
+  origin: string;
+  error?: string;
+  // Contact forms: unread messages, and whether a live page has a form.
+  unread?: number;
+  hasForm?: boolean;
+};
 
 function PageChoice({ name, label, value, pages }: { name: string; label: string; value: string; pages: Page[] }) {
   return (
@@ -172,7 +186,7 @@ function PageChoice({ name, label, value, pages }: { name: string; label: string
   );
 }
 
-export function renderDashboard({ user, pages, site, media, origin, error }: DashboardProps) {
+export function renderDashboard({ user, pages, site, media, origin, error, unread = 0, hasForm = false }: DashboardProps) {
   const movable = pages.filter((page) => page.slug !== HOME);
   return html(
     <html lang="de">
@@ -182,6 +196,11 @@ export function renderDashboard({ user, pages, site, media, origin, error }: Das
 
         <main className="a-main">
           <ErrorMessage error={error} />
+          {unread > 0 && (
+            <p className="a-notice">
+              <a href="/admin/messages">{unread === 1 ? "1 neue Nachricht" : `${unread} neue Nachrichten`}</a> aus dem Kontaktformular.
+            </p>
+          )}
 
           <section className="a-section">
             <h2>Seiten</h2>
@@ -318,6 +337,11 @@ export function renderDashboard({ user, pages, site, media, origin, error }: Das
               <button className="a-primary">ZIP herunterladen</button>
             </form>
             <p className="a-muted">Die Adresse wird für Suchmaschinen und Link-Vorschauen gebraucht.</p>
+            {hasForm && (
+              <p className="a-muted">
+                Kontaktformulare brauchen den Theta-Server, der die Nachrichten annimmt. In den exportierten Dateien fehlen sie deshalb.
+              </p>
+            )}
           </section>
         </main>
       </body>
@@ -588,4 +612,143 @@ export function renderSharedSections({ user, sections, error }: { user: User; se
       </li>)}</ul>
       {sections.length === 0 && <p>Noch keine gemeinsamen Abschnitte. Du kannst auch einen vorhandenen Abschnitt im Editor über „Gemeinsam pflegen“ übernehmen.</p>}
     </main></body></html>);
+}
+
+type MessagesProps = {
+  user: User;
+  messages: Message[];
+  mail: Omit<MailSettings, "password"> & { hasPassword: boolean } | null;
+  hasForm: boolean;
+  error?: string;
+  notice?: string;
+};
+
+const mailStatus: Record<Message["mail"], string | null> = {
+  none: null,
+  pending: "E-Mail wird gesendet",
+  sent: "Per E-Mail weitergeleitet",
+  failed: "E-Mail konnte nicht gesendet werden",
+};
+
+// Characters like ? or & in an address must not add recipients or a subject to the link.
+const mailto = (email: string, subject?: string) =>
+  `mailto:${email.split("@").map(encodeURIComponent).join("@")}${subject ? `?subject=${encodeURIComponent(subject)}` : ""}`;
+
+const dateTime = (iso: string) => new Date(iso).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" });
+
+export function renderMessages({ user, messages, mail, hasForm, error, notice }: MessagesProps) {
+  const unread = messages.filter((message) => !message.readAt).length;
+  return html(
+    <html lang="de">
+      <AdminHead title="Nachrichten" />
+      <body>
+        <AdminBar user={user} current="messages" />
+        <main className="a-main">
+          <ErrorMessage error={error} />
+          {notice && (
+            <p className="a-notice" role="status">
+              {notice}
+            </p>
+          )}
+
+          <section className="a-section">
+            <h2>Nachrichten{unread > 0 && ` (${unread} neu)`}</h2>
+            {!hasForm && (
+              <p className="a-muted">
+                Füge im Editor den Block „Kontaktformular“ auf einer Seite ein und veröffentliche sie. Nachrichten von Besuchern erscheinen dann hier.
+              </p>
+            )}
+            {messages.length === 0 ? (
+              <p>Noch keine Nachrichten.</p>
+            ) : (
+              <ul className="a-list a-messages">
+                {messages.map((message) => (
+                  <li key={message.id} className={message.readAt ? undefined : "a-unread"}>
+                    <div className="a-grow">
+                      <p>
+                        <strong>{message.name}</strong> · <a href={mailto(message.email)}>{message.email}</a>
+                        {message.phone && (
+                          <>
+                            {" "}
+                            · <a href={`tel:${message.phone.replace(/[^0-9+]/g, "")}`}>{message.phone}</a>
+                          </>
+                        )}
+                      </p>
+                      <p className="a-muted">
+                        {dateTime(message.createdAt)} · über „{message.pageTitle}“{mailStatus[message.mail] && ` · ${mailStatus[message.mail]}`}
+                      </p>
+                      <p className="a-message-text">{message.message}</p>
+                    </div>
+                    <a className="a-button" href={mailto(message.email, "Re: deine Nachricht")}>
+                      Antworten
+                    </a>
+                    <form method="post" action={`/admin/messages/${message.id}/read`}>
+                      <input type="hidden" name="read" value={message.readAt ? "0" : "1"} />
+                      <button>{message.readAt ? "Als ungelesen markieren" : "Als gelesen markieren"}</button>
+                    </form>
+                    <form method="post" action={`/admin/messages/${message.id}/delete`}>
+                      <button>Löschen</button>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="a-muted">Nachrichten bleiben gespeichert, bis du sie löschst. Lösche sie, sobald du sie nicht mehr brauchst.</p>
+          </section>
+
+          <section className="a-section">
+            <h2>Benachrichtigung per E-Mail</h2>
+            <p className="a-muted">
+              Optional: Trage den Postausgangsserver (SMTP) deines E-Mail-Anbieters ein. Dann kommt jede Nachricht zusätzlich per E-Mail, und du kannst direkt
+              darauf antworten. Die Zugangsdaten findest du in der Hilfe deines Anbieters.
+            </p>
+            <form method="post" action="/admin/messages/mail" className="a-form a-grid">
+              <label>
+                Postausgangsserver
+                <input name="host" required placeholder="smtp.example.com" defaultValue={mail?.host} />
+              </label>
+              <label>
+                Port
+                <input name="port" type="number" min={1} max={65535} required defaultValue={mail?.port ?? 465} />
+              </label>
+              <label>
+                Verschlüsselung
+                <select name="security" defaultValue={mail?.security ?? "tls"}>
+                  <option value="tls">SSL/TLS (meist Port 465)</option>
+                  <option value="starttls">STARTTLS (meist Port 587)</option>
+                </select>
+              </label>
+              <label>
+                Benutzername
+                <input name="user" autoComplete="off" defaultValue={mail?.user} />
+              </label>
+              <label>
+                Passwort
+                <input name="password" type="password" autoComplete="new-password" placeholder={mail?.hasPassword ? "gespeichert, leer lassen zum Behalten" : ""} />
+              </label>
+              <label>
+                Absender
+                <input name="from" type="email" required placeholder="website@example.com" defaultValue={mail?.from} />
+              </label>
+              <label>
+                Empfänger
+                <input name="to" type="email" required placeholder="du@example.com" defaultValue={mail?.to} />
+              </label>
+              <button className="a-primary">Speichern</button>
+            </form>
+            {mail && (
+              <div className="a-inline a-mail-actions">
+                <form method="post" action="/admin/messages/mail/test">
+                  <button className="a-button">Test-E-Mail senden</button>
+                </form>
+                <form method="post" action="/admin/messages/mail/delete">
+                  <button className="a-button">E-Mail-Benachrichtigung ausschalten</button>
+                </form>
+              </div>
+            )}
+          </section>
+        </main>
+      </body>
+    </html>,
+  );
 }

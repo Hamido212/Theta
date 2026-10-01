@@ -636,6 +636,116 @@ div.t-faq-item .t-faq-question {
   margin: 0;
 }
 
+/* Contact form: calm fields in the theme's colours, errors next to the field they belong to. */
+.t-form {
+  /* Red that stays readable on light and dark backgrounds. */
+  --t-form-error: color-mix(in srgb, #dc2626 70%, var(--t-color-text));
+  display: grid;
+  gap: 1rem;
+}
+
+.t-form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+  gap: 1rem;
+  /* An error under one field must not stretch its neighbour. */
+  align-items: start;
+}
+
+.t-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.t-field label {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.t-field input,
+.t-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.7em 0.85em;
+  border: 1px solid color-mix(in srgb, var(--t-color-muted) 45%, transparent);
+  border-radius: min(var(--t-radius), 10px);
+  background: color-mix(in srgb, var(--t-color-text) 3%, var(--t-color-bg));
+  color: var(--t-color-text);
+  font: inherit;
+  line-height: 1.5;
+}
+
+.t-field textarea {
+  resize: vertical;
+  min-height: 8rem;
+}
+
+.t-field input:focus-visible,
+.t-field textarea:focus-visible {
+  outline: 2px solid var(--t-color-accent);
+  outline-offset: 1px;
+  border-color: var(--t-color-accent);
+}
+
+.t-field-invalid input,
+.t-field-invalid textarea {
+  border-color: var(--t-form-error);
+}
+
+.t-field-error,
+.t-form-notice {
+  margin: 0;
+  color: var(--t-form-error);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.t-form-notice {
+  padding: 0.75rem 1rem;
+  border-radius: min(var(--t-radius), 10px);
+  background: color-mix(in srgb, var(--t-form-error) 10%, var(--t-color-bg));
+}
+
+.t-form-privacy {
+  margin: 0;
+  color: var(--t-color-muted);
+  font-size: 0.9rem;
+}
+
+.t-form-privacy a {
+  color: inherit;
+}
+
+.t-form > .t-button {
+  justify-self: start;
+}
+
+.t-form button.t-button {
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+
+.t-form-trap {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.t-form-sent {
+  padding: 1.25rem 1.5rem;
+  border-left: 4px solid var(--t-color-accent);
+  border-radius: min(var(--t-radius), 10px);
+  background: color-mix(in srgb, var(--t-color-accent) 8%, var(--t-color-bg));
+  font-weight: 600;
+}
+
+.t-form-sent p {
+  margin: 0;
+}
+
 .t-divider {
   width: 100%;
   margin: 0;

@@ -4,9 +4,10 @@ import { type Context, Hono, type MiddlewareHandler } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { bodyLimit } from "hono/body-limit";
 import { csrf } from "hono/csrf";
-import { renderBlog, renderDashboard, renderDesign, renderLogin, renderMediaLibrary, renderSetup, renderSetupLocked, renderTrash, renderSharedSections } from "./admin/pages";
+import { renderBlog, renderDashboard, renderDesign, renderLogin, renderMediaLibrary, renderMessages, renderSetup, renderSetupLocked, renderTrash, renderSharedSections } from "./admin/pages";
 import { AuthError, AuthStore, type User } from "./auth";
-import { BLOG, HOME, type NavItem, ValidationError, editPath, pagePath, parseBlocks } from "./blocks";
+import { BLOG, type FormBlock, HOME, type NavItem, type Page, ValidationError, editPath, pagePath, parseBlocks, publicPath } from "./blocks";
+import { ContactStore, RateLimit, parseSubmission } from "./contact";
 import { openDatabase } from "./db";
 import { exportSite } from "./export";
 import { MAX_UPLOAD_BYTES, type MediaItem, MediaStore, builtinMedia } from "./media";
@@ -24,6 +25,8 @@ import { ConflictError, parseVersion, PageStore, SettingsStore, parseDescription
 import { zip } from "./zip";
 import { type PresetId, PRESETS, defaultTheme, isFontFile, themeCss } from "./theme/tokens";
 import { isPageTemplate } from "./templates";
+import { type FormSetup, formAnchor } from "./theme/form";
+import { expandSharedSections } from "./shared-sections";
 
 const SESSION_COOKIE = "theta_session";
 
@@ -57,11 +60,13 @@ export type AppOptions = {
   setupToken?: string;
   // Public address of the site, e.g. https://example.com, when running behind a proxy.
   publicUrl?: string;
+  // Inbox for contact forms. Without it, forms are left out of pages.
+  contact?: ContactStore;
 };
 
 type Env = { Variables: { user: User } };
 
-export function createApp({ pages, settings, media, auth, setupToken, publicUrl }: AppOptions) {
+export function createApp({ pages, settings, media, auth, setupToken, publicUrl, contact }: AppOptions) {
   const app = new Hono<Env>();
 
   const siteContext = (c: Context<Env>): SiteContext => ({
@@ -76,6 +81,12 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
       return live ? [[section.slug, live.blocks]] : [];
     })),
   });
+
+  // Whether a published page or post contains a contact form, directly or in a shared section.
+  const hasLiveForm = (c: Context<Env>) => {
+    const shared = siteContext(c).sharedSections;
+    return [...pages.publishedPages(), ...pages.posts()].some((page) => expandSharedSections(page.blocks, shared).some((block) => block.type === "form"));
+  };
 
   // Rejects form posts from other sites, so nobody can act in the name of a logged-in user.
   app.use(csrf(publicUrl ? { origin: new URL(publicUrl).origin } : undefined));
@@ -121,7 +132,54 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
 
   // Public site
 
-  app.get("/", (c) => c.html(renderPage(pages.live(HOME)!, siteContext(c))));
+  // Contact forms post back to the page they are on. ?gesendet=<form> after a redirect shows the thank-you note.
+  const formSetup = (c: Context<Env>, path: string, attempt?: FormSetup["attempt"]): FormSetup | undefined => {
+    if (!contact) return undefined;
+    const site = settings.site();
+    const privacy = site.privacy && pages.live(site.privacy) ? publicPath(site.privacy) : undefined;
+    return { action: path, token: contact.token(), privacyHref: privacy, english: site.language === "en", sent: attempt ? undefined : c.req.query("gesendet"), attempt };
+  };
+  const showPage = (c: Context<Env>, page: Page) => c.html(renderPage(page, siteContext(c), formSetup(c, pagePath(page))));
+
+  // Five messages per visitor in ten minutes. Behind a proxy the visitor's address is the last
+  // one the proxy added; earlier entries come from the visitor and could be made up.
+  const contactLimit = new RateLimit(5, 10 * 60_000);
+  const visitor = (c: Context<Env>) =>
+    (publicUrl && c.req.header("x-forwarded-for")?.split(",").at(-1)?.trim()) ||
+    (c.env as { requestIP?: (request: Request) => { address: string } | null } | undefined)?.requestIP?.(c.req.raw)?.address ||
+    "unknown";
+
+  const receiveMessage = async (c: Context<Env>, page: Page | null) => {
+    if (!contact || !page) return c.html(renderNotFound(siteContext(c)), 404);
+    const context = siteContext(c);
+    const path = pagePath(page);
+    const body = await c.req.parseBody();
+    const formId = typeof body._form === "string" ? body._form : "";
+    const block = expandSharedSections(page.blocks, context.sharedSections).find((item): item is FormBlock => item.type === "form" && item.id === formId);
+    if (!block) return c.html(renderNotFound(context), 404);
+    const english = context.site.language === "en";
+    const sent = () => c.redirect(`${path}?gesendet=${encodeURIComponent(block.id)}#${formAnchor(block.id)}`, 303);
+    // Bots fill in the hidden field. They get the same answer as people, so they learn nothing.
+    if (typeof body.website === "string" && body.website !== "") return sent();
+
+    const { submission, errors } = parseSubmission(body, block.phone, english);
+    const retry = (notice: string | undefined, status: 422 | 429) =>
+      c.html(renderPage(page, context, formSetup(c, path, { block: block.id, values: submission, errors, notice })), status);
+    if (Object.keys(errors).length > 0) return retry(undefined, 422);
+    const token = contact.checkToken(body._token);
+    if (token === "invalid") return retry(english ? "The form had expired. Please send it again." : "Das Formular war abgelaufen. Bitte sende es noch einmal ab.", 422);
+    if (token === "too-fast") return retry(english ? "That was very quick. Please check your details and send again." : "Das ging sehr schnell. Bitte prüfe deine Angaben und sende noch einmal ab.", 422);
+    if (!contactLimit.allow(visitor(c)) || contact.recentCount(60) >= 100) {
+      return retry(english ? "Too many messages right now. Please try again in a few minutes." : "Gerade kommen sehr viele Nachrichten an. Bitte versuch es in ein paar Minuten noch einmal.", 429);
+    }
+    const message = contact.add({ slug: page.slug, title: page.title }, submission);
+    // The visitor does not wait for the mail server; the inbox shows whether the e-mail went out.
+    void contact.notify(message, { name: context.site.name, origin: context.origin });
+    return sent();
+  };
+
+  app.get("/", (c) => showPage(c, pages.live(HOME)!));
+  app.post("/", (c) => receiveMessage(c, pages.live(HOME)));
   app.get("/sitemap.xml", (c) =>
     c.body(renderSitemap([...pages.publishedPages(), ...pages.posts()], siteContext(c).origin), 200, { "content-type": "application/xml; charset=utf-8" }),
   );
@@ -135,8 +193,9 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
   // Drafts are only visible in the editor.
   app.get(`/${BLOG}/:slug{[a-z0-9-]+}`, (c) => {
     const post = pages.post(c.req.param("slug"));
-    return post ? c.html(renderPage(post, siteContext(c))) : c.html(renderNotFound(siteContext(c)), 404);
+    return post ? showPage(c, post) : c.html(renderNotFound(siteContext(c)), 404);
   });
+  app.post(`/${BLOG}/:slug{[a-z0-9-]+}`, (c) => receiveMessage(c, pages.post(c.req.param("slug"))));
 
   // Accounts
 
@@ -225,7 +284,16 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
 
   const dashboard = (c: Context<Env>, error?: string) =>
     c.html(
-      renderDashboard({ user: c.get("user"), pages: pages.list(), site: settings.site(), media: media.list(), origin: siteContext(c).origin, error }),
+      renderDashboard({
+        user: c.get("user"),
+        pages: pages.list(),
+        site: settings.site(),
+        media: media.list(),
+        origin: siteContext(c).origin,
+        error,
+        unread: contact?.unread(),
+        hasForm: hasLiveForm(c),
+      }),
       error ? 400 : 200,
     );
 
@@ -298,6 +366,61 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
     }
   });
 
+  // Contact form inbox and optional e-mail copies
+
+  const messagesPage = (c: Context<Env>, { error, notice }: { error?: string; notice?: string } = {}) => {
+    if (!contact) return c.notFound();
+    const mail = contact.mailSettings();
+    const hasForm = hasLiveForm(c);
+    return c.html(
+      renderMessages({
+        user: c.get("user"),
+        messages: contact.list(),
+        mail: mail && { host: mail.host, port: mail.port, security: mail.security, user: mail.user, from: mail.from, to: mail.to, hasPassword: mail.password !== "" },
+        hasForm,
+        error,
+        notice,
+      }),
+      error ? 400 : 200,
+    );
+  };
+  const messageId = (c: Context<Env>) => Number(c.req.param("id"));
+
+  app.get("/admin/messages", (c) => messagesPage(c));
+  app.post("/admin/messages/:id{[0-9]+}/read", async (c) => {
+    const form = await c.req.parseBody();
+    contact?.markRead(messageId(c), form.read !== "0");
+    return c.redirect("/admin/messages", 303);
+  });
+  app.post("/admin/messages/:id{[0-9]+}/delete", (c) => {
+    contact?.delete(messageId(c));
+    return c.redirect("/admin/messages", 303);
+  });
+  app.post("/admin/messages/mail", async (c) => {
+    if (!contact) return c.notFound();
+    try {
+      contact.saveMailSettings(await c.req.parseBody());
+      return messagesPage(c, { notice: "Gespeichert. Sende eine Test-E-Mail, um die Einstellungen zu prüfen." });
+    } catch (err) {
+      if (err instanceof ValidationError) return messagesPage(c, { error: err.message });
+      throw err;
+    }
+  });
+  app.post("/admin/messages/mail/delete", (c) => {
+    contact?.removeMailSettings();
+    return messagesPage(c, { notice: "E-Mail-Benachrichtigung ausgeschaltet. Nachrichten landen weiter hier." });
+  });
+  app.post("/admin/messages/mail/test", async (c) => {
+    if (!contact) return c.notFound();
+    try {
+      await contact.sendTest(settings.site());
+      return messagesPage(c, { notice: `Test-E-Mail an ${contact.mailSettings()!.to} gesendet. Sieh in deinem Postfach nach, auch im Spam-Ordner.` });
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      return messagesPage(c, { error: `Die Test-E-Mail konnte nicht gesendet werden: ${reason}` });
+    }
+  });
+
   app.get("/admin/trash", (c) => c.html(renderTrash({ user: c.get("user"), pages: pages.trash() })));
   app.post("/admin/trash/:slug/restore", async (c) => {
     const form = await c.req.parseBody();
@@ -314,7 +437,8 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
     const page = pages.get(c.req.param("slug"));
     c.header("Cache-Control", "private, no-store");
     c.header("X-Robots-Tag", "noindex, nofollow");
-    return page ? c.html(renderPage(page, siteContext(c))) : c.notFound();
+    // The form shows as it will look; it sends to the live page.
+    return page ? c.html(renderPage(page, siteContext(c), formSetup(c, pagePath(page)))) : c.notFound();
   });
 
   app.get("/api/section-templates", (c) => c.json(settings.templates()));
@@ -572,7 +696,11 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
   app.get("/:slug{[a-z0-9-]+}", (c) => {
     const page = pages.live(c.req.param("slug"));
     // Posts live under /blog only.
-    return page?.kind === "page" ? c.html(renderPage(page, siteContext(c))) : c.html(renderNotFound(siteContext(c)), 404);
+    return page?.kind === "page" ? showPage(c, page) : c.html(renderNotFound(siteContext(c)), 404);
+  });
+  app.post("/:slug{[a-z0-9-]+}", (c) => {
+    const page = pages.live(c.req.param("slug"));
+    return receiveMessage(c, page?.kind === "page" ? page : null);
   });
 
   app.notFound((c) => c.html(renderNotFound(siteContext(c)), 404));
@@ -604,7 +732,7 @@ if (import.meta.main) {
   const server = Bun.serve({
     hostname: process.env.THETA_HOST ?? "127.0.0.1",
     port: Number(process.env.PORT ?? 3000),
-    fetch: createApp({ pages: new PageStore(db), settings: new SettingsStore(db), media, auth, setupToken, publicUrl }).fetch,
+    fetch: createApp({ pages: new PageStore(db), settings: new SettingsStore(db), media, auth, setupToken, publicUrl, contact: new ContactStore(db) }).fetch,
   });
 
   const base = publicUrl ?? server.url;

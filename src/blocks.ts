@@ -42,6 +42,9 @@ export type HoursBlock = { id: string; type: "hours"; rows: HoursRow[]; note: st
 // People with a photo, name, role and a few words.
 export type TeamMember = { focal?: FocalPoint; name: string; role: string; text: string; src: string; alt: string };
 export type TeamBlock = { id: string; type: "team"; members: TeamMember[] };
+// A contact form. Visitors send name, e-mail address, optionally a phone number, and a message;
+// it arrives in the admin inbox and, if a mail server is set up, by e-mail.
+export type FormBlock = { id: string; type: "form"; button: string; success: string; phone: boolean };
 
 export type Block =
   | HeadingBlock
@@ -58,6 +61,7 @@ export type Block =
   | HeroBlock
   | PricesBlock
   | FaqBlock
+  | FormBlock
   | HoursBlock
   | TeamBlock;
 export type BlockType = Block["type"];
@@ -146,6 +150,7 @@ export const blockLabels: Record<BlockType, string> = {
   faq: "Fragen & Antworten",
   hours: "Öffnungszeiten",
   team: "Team",
+  form: "Kontaktformular",
 };
 
 export const sectionBackgrounds: Record<SectionBackground, string> = {
@@ -206,6 +211,8 @@ export function newBlock(type: BlockType, id: string = crypto.randomUUID()): Blo
       };
     case "team":
       return { id, type, members: [emptyTeamMember(), emptyTeamMember(), emptyTeamMember()] };
+    case "form":
+      return { id, type, button: "Nachricht senden", success: "Danke für deine Nachricht! Wir melden uns bald.", phone: false };
   }
 }
 
@@ -251,6 +258,8 @@ const FIELD_NAMES: [RegExp, string][] = [
   [/\.(question)\b/g, ": Die Frage"],
   [/\.(answer)\b/g, ": Die Antwort"],
   [/\.(role)\b/g, ": Die Aufgabe"],
+  [/\.(button)\b/g, ": Die Beschriftung des Buttons"],
+  [/\.(success)\b/g, ": Die Bestätigung nach dem Absenden"],
   [/\.(level)\b/g, ": Die Art der Überschrift"],
 ];
 
@@ -427,6 +436,14 @@ export function parseBlocks(input: unknown): Block[] {
             text: string(member.text, `${at}.text`, 2_000),
             ...image(member, at),
           })),
+        };
+      case "form":
+        return {
+          id,
+          type: "form",
+          button: string(value.button, `${where}.button`, 100),
+          success: string(value.success, `${where}.success`, 500),
+          phone: value.phone === true,
         };
       default:
         throw new ValidationError(`${where}: unbekannter Typ ${JSON.stringify(value.type)}`);
