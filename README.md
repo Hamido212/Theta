@@ -133,7 +133,7 @@ bun run typecheck  # Typprüfung
 bun run build      # Programm für diesen Rechner in dist/theta/
 ```
 
-`bun run build` packt Server, Editor, Stylesheets, Schriften und Bilder in eine einzige Programmdatei (`scripts/build.ts`, Einstieg `src/desktop.ts`). Nur die Bildbibliothek sharp liegt als Ordner `node_modules` daneben, weil sie aus nativen Bibliotheken besteht. Ein Tag wie `v0.1.0` baut über `.github/workflows/release.yml` die Programme für alle Systeme auf deren eigenen Rechnern, hängt sie an ein GitHub-Release und veröffentlicht das Docker-Image unter `ghcr.io/hamido212/theta`.
+`bun run build` packt Server, Editor, Stylesheets, Schriften und Bilder in eine einzige Programmdatei (`scripts/build.ts`, Einstieg `src/desktop.ts`). Nur die Bildbibliothek sharp liegt als Ordner `node_modules` daneben, weil sie aus nativen Bibliotheken besteht. Ein Tag wie `v0.1.0` baut über `.github/workflows/release.yml` die Programme für alle Systeme auf deren eigenen Rechnern, hängt sie an ein GitHub-Release und veröffentlicht das Docker-Image unter `ghcr.io/hamido212/theta`. Den Text des Releases schreibst du vorher nach `docs/releases/<tag>.md`, etwa `docs/releases/v0.1.0.md`.
 
 Beim Start aktualisiert Theta ältere Datenbanken automatisch. Bereits öffentliche Seiten und Blogbeiträge bleiben veröffentlicht; bisherige Beitragsentwürfe bleiben privat. Lade vor einem Update eine Sicherung herunter.
 
@@ -142,3 +142,7 @@ Die Speicher-API `PUT /api/pages/:slug` erwartet die zuletzt gelesene numerische
 Gemeinsame Abschnitte sind intern Seiten mit `kind: "section"`, eigener Live-Fassung und Verlauf. `GET /api/shared-sections` liefert angemeldeten Nutzern Entwürfe, veröffentlichte Blöcke und Verwendungen; `POST /api/shared-sections` legt aus `{ title, blocks }` einen Entwurf an. Die Bearbeitung verwendet dieselbe Speicher-API. Einbindungen speichern `{ id, type: "shared", sectionId }`. Ein zentraler Abschnitt enthält genau einen Abschnittsmarker mit Inhalt, ohne weitere Abschnitte, Einbindungen, Titelbilder oder H1. Die Datenbank braucht dafür keine neue Migration. Gemeinsame Abschnitte erscheinen nicht als eigene öffentliche Seiten, im Menü oder in der Sitemap. Alle API-Schreibzugriffe weisen einen vorhandenen fremden `Origin` zurück; hinter einem Proxy muss `THETA_URL` die öffentliche Adresse enthalten.
 
 Aufgaben und Prüfungen aus dem HYOS-Praxistest stehen in [docs/hyos-editor-aufgaben.md](docs/hyos-editor-aufgaben.md).
+
+## Lizenz
+
+Theta steht unter der [MIT-Lizenz](LICENSE). Die mitgelieferten Schriften stehen unter der SIL Open Font License, die Bildbibliothek sharp unter der Apache-Lizenz 2.0 und libvips unter der LGPL 3.0.

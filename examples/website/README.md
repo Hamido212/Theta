@@ -25,7 +25,8 @@ schreibt die veröffentlichte Website nach `examples/website/export/`. Die Adres
 
 ## Vor dem Veröffentlichen
 
-- **Impressum** und **Datenschutz** enthalten die Angaben von Hamid Yosefsei (wie auf hyos.tech). Die Datenschutzerklärung ist ein knapper Entwurf für eine Website ohne Cookies, Formular und fremde Dienste; prüfe sie, bevor die Website online geht, und ergänze den Webhoster.
+- **Impressum** und **Datenschutz** enthalten die Angaben von Hamid Yosefsei (wie auf hyos.tech). Die Datenschutzerklärung ist ein knapper Entwurf für eine Website bei Vercel ohne Cookies, Formular und weitere fremde Dienste; prüfe sie, bevor die Website online geht.
+- Bei Vercel lädst du den exportierten Ordner hoch, zum Beispiel mit `vercel deploy examples/website/export --prod`. Vorher `examples/website/data` löschen, wenn die Website mit einem älteren Stand angelegt wurde, denn die Inhalte entstehen nur beim ersten Start.
 - Die Download-Seite verlinkt auf [GitHub Releases](https://github.com/Hamido212/Theta/releases). Dort erscheinen die Programme, sobald ein Tag wie `v0.1.0` den Release-Workflow startet.
 - Die Angaben zu Hugo, Astro und EmDash haben den Stand 1. Oktober 2026.
 - Das Editor-Bild liegt in `docs/theta-editor.webp` und zeigt den Editor mit dieser Startseite. Das Logo ist `media/theta-logo.svg`; es passt sich hellen und dunklen Geräten an.
