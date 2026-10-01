@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { assetFile } from "./assets";
 import { BLOG, HOME } from "./blocks";
 import { builtinMedia, type MediaStore } from "./media";
-import { type SiteContext, renderBlogIndex, renderFeed, renderNotFound, renderPage, renderRobots, renderSitemap } from "./render";
+import { type SiteContext, postSummaries, renderBlogIndex, renderFeed, renderNotFound, renderPage, renderRobots, renderSitemap } from "./render";
 import type { Redirect } from "./redirects";
 import type { PageStore, SettingsStore } from "./store";
 import { FONTS, fontFiles, themeCss } from "./theme/tokens";
@@ -29,6 +29,8 @@ export async function exportSite({ pages, settings, media }: Stores, origin: str
       const live = pages.live(section.slug);
       return live ? [[section.slug, live.blocks]] : [];
     })),
+    layoutRules: settings.layoutRules(),
+    posts: postSummaries(posts),
   };
 
   for (const page of all) {

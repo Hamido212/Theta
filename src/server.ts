@@ -16,6 +16,7 @@ import { exportSite } from "./export";
 import { MAX_UPLOAD_BYTES, type MediaItem, MediaStore, builtinMedia } from "./media";
 import {
   type SiteContext,
+  postSummaries,
   renderBlogIndex,
   renderEditor,
   renderFeed,
@@ -29,7 +30,7 @@ import { zip } from "./zip";
 import { type PresetId, PRESETS, defaultTheme, isFontFile, themeCss } from "./theme/tokens";
 import { isPageTemplate } from "./templates";
 import { type FormSetup, formAnchor } from "./theme/form";
-import { expandSharedSections } from "./shared-sections";
+import { liveContent } from "./shared-sections";
 
 const SESSION_COOKIE = "theta_session";
 
@@ -70,11 +71,13 @@ export type AppOptions = {
   geocoder?: Geocoder;
   // Download and restore of complete backups. Without it, the backup section is hidden.
   backups?: Backups;
+  // Downloads pictures pasted from another Theta site; fetch unless replaced (tests).
+  download?: typeof fetch;
 };
 
 type Env = { Variables: { user: User } };
 
-export function createApp({ pages, settings, media, auth, setupToken, publicUrl, contact, geocoder = nominatim(), backups }: AppOptions) {
+export function createApp({ pages, settings, media, auth, setupToken, publicUrl, contact, geocoder = nominatim(), backups, download = fetch }: AppOptions) {
   const app = new Hono<Env>();
 
   // Requests stay below 128 MB, except restoring a backup, which carries all images of a site.
@@ -97,12 +100,14 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl,
       const live = pages.live(section.slug);
       return live ? [[section.slug, live.blocks]] : [];
     })),
+    layoutRules: settings.layoutRules(),
+    posts: postSummaries(pages.posts()),
   });
 
   // Whether a published page or post contains a contact form, directly or in a shared section.
   const hasLiveForm = (c: Context<Env>) => {
-    const shared = siteContext(c).sharedSections;
-    return [...pages.publishedPages(), ...pages.posts()].some((page) => expandSharedSections(page.blocks, shared).some((block) => block.type === "form"));
+    const context = siteContext(c);
+    return [...pages.publishedPages(), ...pages.posts()].some((page) => liveContent(page, context).some((block) => block.type === "form"));
   };
 
   // Rejects form posts from other sites, so nobody can act in the name of a logged-in user.
@@ -183,7 +188,7 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl,
     const path = pagePath(page);
     const body = await c.req.parseBody();
     const formId = typeof body._form === "string" ? body._form : "";
-    const block = expandSharedSections(page.blocks, context.sharedSections).find((item): item is FormBlock => item.type === "form" && item.id === formId);
+    const block = liveContent(page, context).find((item): item is FormBlock => item.type === "form" && item.id === formId);
     if (!block) return c.html(renderNotFound(context), 404);
     const english = context.site.language === "en";
     const sent = () => c.redirect(`${path}?gesendet=${encodeURIComponent(block.id)}#${formAnchor(block.id)}`, 303);
@@ -320,7 +325,7 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl,
       ...(posts.some((post) => post.publishedAt) ? [{ slug: BLOG, title: "Blog", href: `/${BLOG}` }] : []),
       ...posts.map((post) => ({ slug: post.slug, title: post.title, href: pagePath(post) })),
     ];
-    return c.html(renderEditor({ page, site: settings.site(), nav: pages.nav(settings.site()), legal: pages.legal(settings.site()), pages: targets, templates: settings.templates(), sharedSections: sharedData() }, themeCss(settings.theme())));
+    return c.html(renderEditor({ page, site: settings.site(), nav: pages.nav(settings.site()), legal: pages.legal(settings.site()), pages: targets, templates: settings.templates(), sharedSections: sharedData(), layoutRules: settings.layoutRules(), posts: postSummaries(pages.posts()) }, themeCss(settings.theme())));
   };
   app.get("/edit", (c) => editor(c, HOME));
   app.get(`/edit/${HOME}`, (c) => c.redirect("/edit"));
@@ -538,7 +543,17 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl,
       throw err;
     }
   });
-  const sharedAdmin = (c: Context<Env>, error?: string) => c.html(renderSharedSections({ user: c.get("user"), sections: sharedData(), error }), error ? 400 : 200);
+  const sharedAdmin = (c: Context<Env>, error?: string) => c.html(renderSharedSections({ user: c.get("user"), sections: sharedData(), rules: settings.layoutRules(), error }), error ? 400 : 200);
+  app.post("/admin/shared-sections/:slug/rule", async (c) => {
+    const form = await c.req.parseBody();
+    try {
+      settings.saveLayoutRule(c.req.param("slug"), typeof form.place === "string" ? form.place : "");
+      return c.redirect("/admin/shared-sections");
+    } catch (err) {
+      if (err instanceof ValidationError) return sharedAdmin(c, err.message);
+      throw err;
+    }
+  });
   app.get("/admin/shared-sections", (c) => sharedAdmin(c));
   app.post("/admin/shared-sections", async (c) => {
     const form = await c.req.parseBody();
@@ -628,6 +643,37 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl,
       return c.json(await upload(c), 201);
     } catch (err) {
       if (err instanceof ValidationError) return c.json({ error: err.message }, 400);
+      throw err;
+    }
+  });
+
+  // Sections copied on another Theta site bring their pictures along. Only addresses of a
+  // Theta media library are accepted, and only files that really are pictures are kept.
+  app.post("/api/media/import", async (c) => {
+    const body = (await c.req.json().catch(() => null)) as { url?: unknown } | null;
+    const fail = (error: string) => c.json({ error }, 400);
+    let url: URL;
+    try {
+      url = new URL(typeof body?.url === "string" ? body.url : "");
+    } catch {
+      return fail("Ungültige Bild-Adresse");
+    }
+    if (!/^https?:$/.test(url.protocol) || !/^\/media\/[\w-]+\/[\w.-]+$/.test(url.pathname) || url.username || url.password) {
+      return fail("Nur Bilder aus der Mediathek einer anderen Theta-Website können übernommen werden.");
+    }
+    let bytes: ArrayBuffer;
+    try {
+      const response = await download(url, { redirect: "error", signal: AbortSignal.timeout(20_000) });
+      if (!response.ok) return fail(`Das Bild ${url.pathname.split("/").pop()} ist auf der anderen Website nicht mehr vorhanden.`);
+      if (Number(response.headers.get("content-length") ?? 0) > MAX_UPLOAD_BYTES) return fail("Das Bild ist größer als 20 MB.");
+      bytes = await response.arrayBuffer();
+    } catch {
+      return fail("Die andere Website ist gerade nicht erreichbar.");
+    }
+    try {
+      return c.json(await media.add(new File([bytes], url.pathname.split("/").pop()!)), 201);
+    } catch (err) {
+      if (err instanceof ValidationError) return fail(err.message);
       throw err;
     }
   });

@@ -26,6 +26,8 @@ import {
   type FormBlock,
   type MapBlock,
   type TeamMember,
+  type PostsBlock,
+  MAX_POSTS,
   MAX_HOURS_ROWS,
   MAX_LIST_ITEMS,
   MAX_TEAM,
@@ -73,6 +75,8 @@ export function BlockSettings({ block, onChange, pages }: Props<Block>) {
       return <FormSettings block={block} onChange={change} pages={pages} />;
     case "map":
       return <MapSettings block={block} onChange={change} pages={pages} />;
+    case "posts":
+      return <PostsSettings block={block} onChange={change} pages={pages} />;
     default:
       return null;
   }
@@ -200,7 +204,7 @@ function GallerySettings({ block, onChange }: Props<GalleryBlock>) {
 }
 
 // A link target field that suggests the site's own pages.
-function LinkTarget({ id, label, value, pages, onChange }: { id: string; label: string; value: string; pages: NavItem[]; onChange: (href: string) => void }) {
+export function LinkTarget({ id, label, value, pages, onChange }: { id: string; label: string; value: string; pages: NavItem[]; onChange: (href: string) => void }) {
   const listId = `theta-pages-${id}`;
   return (
     <label>
@@ -623,6 +627,27 @@ function MapSettings({ block, onChange }: Props<MapBlock>) {
       <p className="theta-note">
         Die Karte lädt erst, wenn Besucher darauf klicken; vorher werden keine Daten an OpenStreetMap übertragen. Die Suche fragt den Ortsdienst von OpenStreetMap.
       </p>
+    </div>
+  );
+}
+
+function PostsSettings({ block, onChange }: Props<PostsBlock>) {
+  return (
+    <div className="theta-settings">
+      <label>
+        Anzahl
+        <select value={block.count} onChange={(e) => onChange({ count: Number(e.target.value) })}>
+          {Array.from({ length: MAX_POSTS }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n === 1 ? "Der neueste Beitrag" : `Die ${n} neuesten Beiträge`}</option>)}
+        </select>
+      </label>
+      <label>
+        Darstellung
+        <select value={block.style} onChange={(e) => onChange({ style: e.target.value as PostsBlock["style"] })}>
+          <option value="cards">Karten mit Bild und Vorschau</option>
+          <option value="list">Schlichte Liste mit Datum</option>
+        </select>
+      </label>
+      <p className="theta-note">Füllt sich von selbst: Sobald du einen Beitrag veröffentlichst, erscheint er hier. Auf einem Beitrag selbst wird er nicht noch einmal aufgeführt.</p>
     </div>
   );
 }

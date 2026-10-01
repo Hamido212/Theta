@@ -18,7 +18,7 @@ import {
 import { RedirectStore } from "./redirects";
 import { type ThemeSettings, defaultTheme, parseTheme } from "./theme/tokens";
 import { type SavedSectionTemplate, type PageTemplateId, pageBlocks } from "./templates";
-import { validateSection } from "./shared-sections";
+import { type LayoutPlace, type LayoutRule, layoutPlaces, validateSection } from "./shared-sections";
 
 type PageRow = {
   slug: string;
@@ -373,6 +373,22 @@ export class SettingsStore {
   }
 
   deleteTemplate(id: string) { this.db.query("DELETE FROM section_templates WHERE id = ?").run(id); }
+
+  layoutRules(): LayoutRule[] {
+    const stored = this.get("layout-rules") as { rules?: LayoutRule[] } | null;
+    return (stored?.rules ?? []).filter((rule) => Object.hasOwn(layoutPlaces, rule.place));
+  }
+
+  // One rule per shared section; an empty place removes it.
+  saveLayoutRule(sectionId: string, place: unknown): LayoutRule[] {
+    if (place !== "" && !Object.hasOwn(layoutPlaces, place as string)) throw new ValidationError("Bitte einen gültigen Ort auswählen");
+    if (place !== "" && !this.db.query("SELECT 1 FROM pages WHERE slug = ? AND kind = 'section' AND deleted_at IS NULL").get(sectionId)) {
+      throw new ValidationError("Gemeinsamer Abschnitt nicht gefunden");
+    }
+    const rules = [...this.layoutRules().filter((rule) => rule.sectionId !== sectionId), ...(place === "" ? [] : [{ sectionId, place: place as LayoutPlace }])];
+    this.set("layout-rules", { rules });
+    return rules;
+  }
 
   site(): SiteSettings {
     return { ...defaultSite, ...(this.get("site") as Partial<SiteSettings> | null) };

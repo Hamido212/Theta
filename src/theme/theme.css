@@ -1106,3 +1106,81 @@ div.t-faq-item .t-faq-question {
 .t-band-align-center .t-buttons { justify-content: center; }
 .t-band .t-hero { width: 100%; margin-inline: 0; padding-inline: 0; }
 .t-band .t-width-wide, .t-band .t-width-full { max-width: 100%; margin-inline: 0; }
+
+/* Newest posts: cards in a grid or a compact list with dates, filled from the blog. */
+.t-latest-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+  gap: calc(var(--t-space) * 0.75);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.t-latest-card {
+  --t-card-pad: min(var(--t-space), 1.25rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: var(--t-card-pad);
+  border-radius: var(--t-radius);
+  background: color-mix(in srgb, var(--t-color-text) 5%, var(--t-color-bg));
+  overflow: hidden;
+}
+
+.t-latest-card img {
+  display: block;
+  width: calc(100% + 2 * var(--t-card-pad));
+  max-width: none;
+  height: auto;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  margin: calc(var(--t-card-pad) * -1) calc(var(--t-card-pad) * -1) 0.6rem;
+}
+
+.t-latest-card time,
+.t-latest-list time {
+  color: var(--t-color-muted);
+  font-size: 0.9rem;
+}
+
+.t-latest-card p {
+  margin: 0;
+  color: var(--t-color-muted);
+}
+
+.t-latest-title {
+  margin: 0;
+  font-family: var(--t-font-heading);
+  font-size: 1.2rem;
+  line-height: 1.25;
+}
+
+.t-latest-title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.t-latest-title a:hover {
+  color: var(--t-color-accent);
+}
+
+.t-latest-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.t-latest-list li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.25rem 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--t-color-muted) 30%, transparent);
+}
+
+.t-latest-list li:first-child {
+  border-top: 1px solid color-mix(in srgb, var(--t-color-muted) 30%, transparent);
+}

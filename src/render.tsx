@@ -7,7 +7,8 @@ import { type ImageLookup, Img, ImageLookupContext } from "./theme/image";
 import { SiteFrame } from "./theme/layout";
 import { FormContext, type FormSetup } from "./theme/form";
 import { LanguageContext } from "./theme/language";
-import { expandSharedSections, type SharedSectionData, type SharedSections } from "./shared-sections";
+import { type LayoutRule, liveContent, visibleBlocks, type SharedSectionData, type SharedSections } from "./shared-sections";
+import { type PostSummary, PostsContext } from "./theme/posts";
 
 // What every page needs to know about the site around it.
 export type SiteContext = {
@@ -22,6 +23,10 @@ export type SiteContext = {
   // The site's design tokens as CSS (see src/theme/tokens.ts).
   themeCss?: string;
   sharedSections?: SharedSections;
+  // Shared sections shown automatically on every page or post (see src/shared-sections.ts).
+  layoutRules?: LayoutRule[];
+  // Published posts for the "newest posts" block, newest first.
+  posts?: PostSummary[];
 };
 
 // Data the browser editor starts with.
@@ -34,6 +39,8 @@ export type EditorData = {
   pages: NavItem[];
   templates?: SavedSectionTemplate[];
   sharedSections?: SharedSectionData[];
+  layoutRules?: LayoutRule[];
+  posts?: PostSummary[];
 };
 
 type DocumentProps = { title: string; language?: "de" | "en"; themeCss?: string; icon?: string; head?: ReactNode; children: ReactNode };
@@ -67,6 +74,15 @@ function coverImage(page: Page): { src: string; alt: string } | undefined {
     if ((block.type === "image" || block.type === "hero") && block.src) return block;
     if (block.type === "gallery" && block.images[0]?.src) return block.images[0];
   }
+}
+
+export function postSummaries(posts: Page[]): PostSummary[] {
+  return posts.flatMap((post) => {
+    if (!post.publishedAt) return [];
+    const visible = { ...post, blocks: visibleBlocks(post.blocks) };
+    const cover = coverImage(visible);
+    return [{ slug: post.slug, href: pagePath(post), title: post.title, publishedAt: post.publishedAt, teaser: excerpt(visible), ...(cover && { cover: { src: cover.src, alt: cover.alt } }) }];
+  });
 }
 
 // Tags for search engines and link previews (Open Graph).
@@ -109,8 +125,8 @@ function PostDate({ page, language }: { page: Page; language?: "de" | "en" }) {
 
 // Public page: plain HTML and CSS, no JavaScript at all. Contact forms only appear with
 // form, which the live server passes; the static export has nobody to receive them.
-export function renderPage(page: Page, { site, nav, legal = [], origin, images = () => null, themeCss, sharedSections }: SiteContext, form?: FormSetup): string {
-  page = { ...page, blocks: expandSharedSections(page.blocks, sharedSections) };
+export function renderPage(page: Page, { site, nav, legal = [], origin, images = () => null, themeCss, sharedSections, layoutRules, posts = [] }: SiteContext, form?: FormSetup): string {
+  page = { ...page, blocks: liveContent(page, { sharedSections, layoutRules }) };
   const post = page.kind === "post";
   return html(
     <Document
@@ -130,7 +146,9 @@ export function renderPage(page: Page, { site, nav, legal = [], origin, images =
           {post && <PostDate page={page} language={site.language} />}
           <LanguageContext.Provider value={site.language ?? "de"}>
             <FormContext.Provider value={form ?? null}>
-              <BlockFlow blocks={page.blocks}>{(block) => <BlockView key={block.id} block={block} />}</BlockFlow>
+              <PostsContext.Provider value={{ posts, current: post ? page.slug : undefined }}>
+                <BlockFlow blocks={page.blocks}>{(block) => <BlockView key={block.id} block={block} />}</BlockFlow>
+              </PostsContext.Provider>
             </FormContext.Provider>
           </LanguageContext.Provider>
           {post && (
@@ -173,7 +191,8 @@ export function renderBlogIndex(posts: Page[], { site, nav, legal = [], origin, 
             </div>
           ) : (
             <ul className="t-posts">
-              {posts.map((post) => {
+              {posts.map((listed) => {
+                const post = { ...listed, blocks: visibleBlocks(listed.blocks) };
                 const cover = coverImage(post);
                 const teaser = excerpt(post);
                 return (
@@ -210,7 +229,7 @@ export function renderFeed(posts: Page[], site: SiteSettings, origin: string): s
         `      <link>${link(pagePath(post))}</link>`,
         `      <guid isPermaLink="true">${link(pagePath(post))}</guid>`,
         post.publishedAt ? `      <pubDate>${new Date(post.publishedAt).toUTCString()}</pubDate>` : "",
-        `      <description>${escapeXml(excerpt(post))}</description>`,
+        `      <description>${escapeXml(excerpt({ ...post, blocks: visibleBlocks(post.blocks) }))}</description>`,
         "    </item>",
       ]
         .filter(Boolean)
