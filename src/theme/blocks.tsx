@@ -20,6 +20,7 @@ import { sectionBackgrounds } from "../blocks";
 import { TextField } from "./fields";
 import { Img } from "./image";
 import { videoPlaceholder, videoSource } from "./video";
+import { SocialIcon } from "./icons";
 
 // The default theme. Every block component renders on the server (edit is undefined)
 // and inside the editor (edit updates the block), so both views look identical.
@@ -115,6 +116,25 @@ function Button({ block, edit }: BlockProps<ButtonBlock>) {
 function Columns({ block, edit }: BlockProps<ColumnsBlock>) {
   const change = (index: number, patch: Partial<ColumnsBlock["items"][number]>) =>
     edit?.({ items: block.items.map((item, i) => (i === index ? { ...item, ...patch } : item)) });
+  if (block.style === "list" || block.style === "timeline") {
+    const Title = block.heading ? "h3" : "h2";
+    return <div className={`t-list t-list-${block.style}`}>
+      {(block.heading || (edit && block.heading !== undefined)) && <div className="t-list-heading">
+        <h2><TextField value={block.heading ?? ""} onChange={edit && ((heading) => edit({ heading }))} placeholder="Überschrift" /></h2>
+        {block.href && block.linkLabel && (edit
+          ? <span className="t-list-all"><TextField value={block.linkLabel} onChange={(linkLabel) => edit({ linkLabel })} /></span>
+          : <a className="t-list-all" href={block.href}>{block.linkLabel}</a>)}
+      </div>}
+      <div className="t-list-items">{block.items.map((item, i) => <div key={i} className="t-list-item">
+        {(item.meta || edit) && <p className="t-list-meta"><TextField value={item.meta ?? ""} onChange={edit && ((meta) => change(i, { meta }))} placeholder="Datum oder Zeitraum" /></p>}
+        <Title className="t-list-title">{!edit && item.href
+          ? <a href={item.href}>{item.title}<span aria-hidden="true" className="t-list-arrow">→</span></a>
+          : <TextField value={item.title} onChange={edit && ((title) => change(i, { title }))} placeholder="Titel" />}</Title>
+        {(edit || item.text.trim()) && <div className="t-text"><TextField value={item.text} onChange={edit && ((text) => change(i, { text }))} rich placeholder="Beschreibung" /></div>}
+        {item.tags?.length ? <ul className="t-tags" aria-label="Tags">{item.tags.map((tag, n) => <li key={n}>{tag}</li>)}</ul> : null}
+      </div>)}</div>
+    </div>;
+  }
   return (
     <div className={`t-columns t-columns-${block.style}`} style={{ "--t-columns": block.items.length } as CSSProperties}>
       {block.items.map((item, i) => (
@@ -191,6 +211,24 @@ function Hero({ block, edit }: BlockProps<HeroBlock>) {
   const changeButton = (index: number, label: string) =>
     edit?.({ buttons: block.buttons.map((button, i) => (i === index ? { ...button, label } : button)) });
   const buttons = edit ? block.buttons : block.buttons.filter((button) => button.label.trim() && button.href);
+  if (block.layout === "profile") {
+    return <div className="t-profile">
+      {block.src && <Img src={block.src} alt={block.alt} focal={block.focal} sizes="128px" eager />}
+      <div className="t-profile-content">
+        {(block.eyebrow || edit) && <p className="t-profile-eyebrow">{edit
+          ? <TextField value={block.eyebrow ?? ""} onChange={(eyebrow) => edit({ eyebrow })} placeholder="Kurzbezeichnung" />
+          : block.eyebrow?.split("|").map((label, i) => <span className="t-profile-badge" key={i}>{label.trim()}</span>)}</p>}
+        <h1 className="t-profile-title"><TextField value={block.title} highlight={block.highlight} onChange={edit && ((title) => edit({ title }))} placeholder="Titel" /></h1>
+        <div className="t-profile-text"><TextField value={block.text} onChange={edit && ((text) => edit({ text }))} multiline placeholder="Kurzbeschreibung" /></div>
+        {block.links?.length ? <div className="t-social-links">{block.links.filter((link) => link.label && link.href).map((link, i) => edit
+          ? <span key={i} title={link.label}><SocialIcon href={link.href} /></span>
+          : <a key={i} href={link.href} aria-label={link.label} title={link.label} rel="noopener"><SocialIcon href={link.href} /></a>)}</div> : null}
+        <div className="t-button-row">{buttons.map((button, i) => edit
+          ? <span key={i} className={`t-button t-button-${i ? "secondary" : "primary"}`}><TextField value={button.label} onChange={(label) => changeButton(i, label)} placeholder="Beschriftung" /></span>
+          : <a key={i} className={`t-button t-button-${i ? "secondary" : "primary"}`} href={button.href}>{button.label}</a>)}</div>
+      </div>
+    </div>;
+  }
   return (
     <div className={block.src ? "t-hero t-hero-image" : "t-hero t-band-accent"}>
       {block.src && <Img src={block.src} alt={block.alt} focal={block.focal} sizes="100vw" eager />}

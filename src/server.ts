@@ -440,6 +440,7 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
       settings.saveSite({
         name: form.name,
         description: form.description ?? "",
+        language: form.language,
         logo: form.logo ?? "",
         footer: form.footer ?? "",
         imprint: form.imprint ?? "",
@@ -501,7 +502,7 @@ export function createApp({ pages, settings, media, auth, setupToken, publicUrl 
   app.get("/assets/fonts/:name", (c) => {
     const name = c.req.param("name");
     if (!isFontFile(name)) return c.notFound();
-    return new Response(asset(`./theme/fonts/${name}`), { headers: { "content-type": "font/woff2", "cache-control": "public, max-age=604800" } });
+    return new Response(asset(`./theme/fonts/${name}`), { headers: { "content-type": name.endsWith(".woff") ? "font/woff" : "font/woff2", "cache-control": "public, max-age=604800" } });
   });
   app.get("/assets/editor.js", async (c) => c.body(await buildEditor(), 200, { "content-type": "text/javascript; charset=utf-8" }));
 

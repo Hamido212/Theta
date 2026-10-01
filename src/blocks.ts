@@ -16,18 +16,18 @@ export type ImageBlock = { id: string; type: "image"; src: string; alt: string; 
 // Galleries show 2 to 4 pictures per row, cropped to squares or in their own proportions.
 export type GalleryBlock = { id: string; type: "gallery"; images: ImageContent[]; columns: 2 | 3 | 4; crop: boolean };
 export type ButtonBlock = { id: string; type: "button"; label: string; href: string; variant: "primary" | "secondary" };
-// Columns are plain text side by side, or cards with an optional picture and link.
-export type Column = { focal?: FocalPoint; title: string; text: string; src: string; alt: string; href: string; linkLabel: string };
-export type ColumnsBlock = { id: string; type: "columns"; style: "plain" | "cards"; items: Column[] };
+// Columns use a text grid, picture cards, stacked cards or a dated timeline.
+export type Column = { focal?: FocalPoint; title: string; text: string; src: string; alt: string; href: string; linkLabel: string; meta?: string; tags?: string[] };
+export type ColumnsBlock = { id: string; type: "columns"; style: "plain" | "cards" | "list" | "timeline"; items: Column[]; heading?: string; href?: string; linkLabel?: string };
 export type VideoBlock = { id: string; type: "video"; url: string; title: string };
 export type QuoteBlock = { id: string; type: "quote"; text: string; cite: string };
 export type DividerBlock = { id: string; type: "divider" };
 // Starts a new full-width band of the page. Everything up to the next section shares its background.
 export type SectionBackground = "plain" | "soft" | "accent" | "inverse";
 export type SectionBlock = { id: string; type: "section"; background: SectionBackground; width?: "content" | "wide" | "full"; spacing?: "compact" | "normal" | "spacious"; align?: "left" | "center" };
-// A large picture across the whole window with the page title, a sentence and up to two buttons on top.
+// A full-width banner or compact profile, with title, text and up to two buttons.
 export type HeroButton = { label: string; href: string };
-export type HeroBlock = { id: string; type: "hero"; focal?: FocalPoint; title: string; text: string; src: string; alt: string; buttons: HeroButton[] };
+export type HeroBlock = { id: string; type: "hero"; focal?: FocalPoint; title: string; text: string; src: string; alt: string; buttons: HeroButton[]; layout?: "banner" | "profile"; eyebrow?: string; highlight?: string; links?: HeroButton[] };
 // A menu or price list: name and price on one line, an optional description below.
 export type PriceItem = { name: string; description: string; price: string };
 export type PricesBlock = { id: string; type: "prices"; items: PriceItem[] };
@@ -93,8 +93,8 @@ export const pagePath = (page: Pick<Page, "slug" | "kind">) =>
 export type RevisionSummary = { id: number; title: string; author: string; createdAt: string };
 export type Revision = RevisionSummary & Pick<Page, "description" | "inNav" | "blocks">;
 
-// "30. September 2026"
-export const formatDate = (iso: string) => new Date(iso).toLocaleDateString("de-DE", { dateStyle: "long" });
+// "30. September 2026" or "Sep 30, 2026" in the site's public language.
+export const formatDate = (iso: string, language: "de" | "en" = "de") => new Date(iso).toLocaleDateString(language === "en" ? "en-US" : "de-DE", language === "en" ? { month: "short", day: "2-digit", year: "numeric" } : { dateStyle: "long" });
 
 const excerptLength = 220;
 
@@ -109,6 +109,8 @@ export function excerpt(page: Page): string {
 export type SiteSettings = {
   name: string;
   description: string;
+  // Older sites default to German. This is the public content language, not the editor language.
+  language?: "de" | "en";
   // Address of an uploaded logo shown in the header instead of the name; empty for none.
   logo: string;
   // Formatted text for the footer, e.g. address, opening hours and social links.
@@ -322,7 +324,10 @@ export function parseBlocks(input: unknown): Block[] {
           id,
           type: "columns",
           // Columns saved before cards existed stay plain.
-          style: value.style === "cards" ? "cards" : "plain",
+          style: value.style === "cards" || value.style === "list" || value.style === "timeline" ? value.style : "plain",
+          ...(value.heading !== undefined && { heading: string(value.heading, `${where}.heading`, 200) }),
+          ...(value.href !== undefined && { href: href(value.href, `${where}.href`) }),
+          ...(value.linkLabel !== undefined && { linkLabel: string(value.linkLabel, `${where}.linkLabel`, 200) }),
           items: items.map((item, i) => {
             const at = `${where}.items[${i}]`;
             const column = object(item, at);
@@ -332,6 +337,8 @@ export function parseBlocks(input: unknown): Block[] {
               ...image({ src: column.src ?? "", alt: column.alt ?? "", focal: column.focal }, at),
               href: href(column.href ?? "", `${at}.href`),
               linkLabel: string(column.linkLabel ?? "", `${at}.linkLabel`, 200),
+              ...(column.meta !== undefined && { meta: string(column.meta, `${at}.meta`, 200) }),
+              ...(column.tags !== undefined && { tags: list(column.tags, `${at}.tags`, 12).map((tag, n) => string(tag, `${at}.tags[${n}]`, 100)) }),
             };
           }),
         };
@@ -361,7 +368,13 @@ export function parseBlocks(input: unknown): Block[] {
           const button = object(item, `${where}.buttons[${i}]`);
           return { label: string(button.label, `${where}.buttons[${i}].label`, 200), href: href(button.href, `${where}.buttons[${i}].href`) };
         });
-        return { id, type: "hero", title: string(value.title, `${where}.title`, 500), text: string(value.text, `${where}.text`, 2_000), ...image(value, where), buttons };
+        return {
+          id, type: "hero", title: string(value.title, `${where}.title`, 500), text: string(value.text, `${where}.text`, 2_000), ...image(value, where), buttons,
+          ...(value.layout !== undefined && { layout: value.layout === "profile" ? "profile" : "banner" }),
+          ...(value.eyebrow !== undefined && { eyebrow: string(value.eyebrow, `${where}.eyebrow`, 200) }),
+          ...(value.highlight !== undefined && { highlight: string(value.highlight, `${where}.highlight`, 200) }),
+          ...(value.links !== undefined && { links: records(value.links, `${where}.links`, 8, (link, at) => ({ label: string(link.label, `${at}.label`, 200), href: href(link.href, `${at}.href`) })) }),
+        };
       }
       case "prices":
         return {

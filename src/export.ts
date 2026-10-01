@@ -39,6 +39,7 @@ export async function exportSite({ pages, settings, media }: Stores, origin: str
   files.set("assets/theme.css", await Bun.file(new URL("./theme/theme.css", import.meta.url)).bytes());
   for (const font of FONTS[settings.theme().fonts].web) {
     for (const name of fontFiles(font)) files.set(`assets/fonts/${name}`, await Bun.file(new URL(`./theme/fonts/${name}`, import.meta.url)).bytes());
+    if (font === "atkinson") files.set("licenses/atkinson-OFL.txt", await Bun.file(new URL("./theme/fonts/atkinson-LICENSE.txt", import.meta.url)).bytes());
   }
 
   // Copy exactly the images the pages refer to, including their smaller versions.

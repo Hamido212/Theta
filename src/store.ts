@@ -135,7 +135,8 @@ export class PageStore {
     return [
       { slug: site.imprint, title: "Impressum" },
       { slug: site.privacy, title: "Datenschutz" },
-    ].filter((item) => item.slug !== "" && this.live(item.slug)?.kind === "page");
+    ].filter((item) => item.slug !== "" && this.live(item.slug)?.kind === "page")
+      .map((item) => ({ ...item, title: site.language === "en" ? this.live(item.slug)!.title : item.title }));
   }
 
   // Creates a page or post from a title and returns it. The address is derived from the title.
@@ -327,9 +328,12 @@ export class SettingsStore {
     };
     const logo = input.logo === undefined ? current.logo : String(input.logo).trim();
     if (logo !== "" && !isSafeImageSrc(logo)) throw new ValidationError("Das Logo muss ein Bild aus der Mediathek sein");
+    const language = input.language ?? current.language ?? "de";
+    if (language !== "de" && language !== "en") throw new ValidationError("Die Website-Sprache muss Deutsch oder Englisch sein");
     const site: SiteSettings = {
       name: text(input.name, "Name", 1, 100),
       description: text(input.description ?? "", "Beschreibung", 0, 300),
+      language,
       logo,
       // Line breaks matter in the footer (e.g. an address), so it is not squeezed like the fields above.
       footer: input.footer === undefined ? current.footer : footerText(input.footer),

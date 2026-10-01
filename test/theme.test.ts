@@ -6,7 +6,7 @@ import { form, testSite } from "./helpers";
 
 describe("tokens", () => {
   test("each preset produces light and dark tokens", () => {
-    for (const preset of ["klar", "modern", "warm", "studio"] as const) {
+    for (const preset of ["klar", "modern", "warm", "studio", "portfolio"] as const) {
       const css = themeCss(defaultTheme(preset));
       expect(css).toContain("--t-color-accent:");
       expect(css).toContain("--t-font-heading:");
@@ -113,6 +113,11 @@ describe("bundled fonts", () => {
     expect(font.status).toBe(200);
     expect(font.headers.get("content-type")).toBe("font/woff2");
     expect((await font.arrayBuffer()).byteLength).toBeGreaterThan(10_000);
+    const atkinson = await request("/assets/fonts/atkinson-regular.woff");
+    expect(atkinson.status).toBe(200);
+    expect(atkinson.headers.get("content-type")).toBe("font/woff");
+    expect((await atkinson.arrayBuffer()).byteLength).toBeGreaterThan(10_000);
+    expect((await request("/assets/fonts/atkinson-LICENSE.txt")).status).toBe(404);
     expect((await request("/assets/fonts/inter-LICENSE.txt")).status).toBe(404);
     expect((await request("/assets/fonts/..%2F..%2Fserver.ts")).status).toBe(404);
   });

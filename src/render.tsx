@@ -31,11 +31,11 @@ export type EditorData = {
   templates?: SavedSectionTemplate[];
 };
 
-type DocumentProps = { title: string; themeCss?: string; icon?: string; head?: ReactNode; children: ReactNode };
+type DocumentProps = { title: string; language?: "de" | "en"; themeCss?: string; icon?: string; head?: ReactNode; children: ReactNode };
 
-function Document({ title, themeCss, icon, head, children }: DocumentProps) {
+function Document({ title, language = "de", themeCss, icon, head, children }: DocumentProps) {
   return (
-    <html lang="de">
+    <html lang={language}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -93,11 +93,11 @@ function FeedLink({ site, nav }: { site: SiteSettings; nav: NavItem[] }) {
   return <link rel="alternate" type="application/rss+xml" title={site.name} href={`/${BLOG}/feed.xml`} />;
 }
 
-function PostDate({ page }: { page: Page }) {
+function PostDate({ page, language }: { page: Page; language?: "de" | "en" }) {
   if (!page.publishedAt) return null;
   return (
     <p className="t-post-meta">
-      <time dateTime={page.publishedAt}>{formatDate(page.publishedAt)}</time>
+      <time dateTime={page.publishedAt}>{formatDate(page.publishedAt, language)}</time>
     </p>
   );
 }
@@ -108,6 +108,7 @@ export function renderPage(page: Page, { site, nav, legal = [], origin, images =
   return html(
     <Document
       title={pageTitle(page, site)}
+      language={site.language}
       themeCss={themeCss}
       icon={site.logo}
       head={
@@ -119,11 +120,11 @@ export function renderPage(page: Page, { site, nav, legal = [], origin, images =
     >
       <ImageLookupContext.Provider value={images}>
         <SiteFrame site={site} nav={nav} legal={legal} current={post ? BLOG : page.slug} linkTo={publicPath}>
-          {post && <PostDate page={page} />}
+          {post && <PostDate page={page} language={site.language} />}
           <BlockFlow blocks={page.blocks}>{(block) => <BlockView key={block.id} block={block} />}</BlockFlow>
           {post && (
             <p className="t-post-back">
-              <a href={`/${BLOG}`}>← Alle Beiträge</a>
+              <a href={`/${BLOG}`}>{site.language === "en" ? "← All posts" : "← Alle Beiträge"}</a>
             </p>
           )}
         </SiteFrame>
@@ -138,6 +139,7 @@ export function renderBlogIndex(posts: Page[], { site, nav, legal = [], origin, 
   return html(
     <Document
       title={`Blog · ${site.name}`}
+      language={site.language}
       themeCss={themeCss}
       icon={site.logo}
       head={
@@ -156,7 +158,7 @@ export function renderBlogIndex(posts: Page[], { site, nav, legal = [], origin, 
           <h1 className="t-heading t-heading-1">Blog</h1>
           {posts.length === 0 ? (
             <div className="t-text">
-              <p>Hier erscheinen bald die ersten Beiträge.</p>
+              <p>{site.language === "en" ? "More posts coming soon." : "Hier erscheinen bald die ersten Beiträge."}</p>
             </div>
           ) : (
             <ul className="t-posts">
@@ -166,7 +168,7 @@ export function renderBlogIndex(posts: Page[], { site, nav, legal = [], origin, 
                 return (
                   <li key={post.slug} className="t-post-card">
                     {cover && <Img src={cover.src} alt={cover.alt} sizes="(min-width: 44rem) 42rem, 100vw" />}
-                    <PostDate page={post} />
+                    <PostDate page={post} language={site.language} />
                     <h2 className="t-post-title">
                       <a href={pagePath(post)}>{post.title}</a>
                     </h2>
@@ -209,8 +211,8 @@ export function renderFeed(posts: Page[], site: SiteSettings, origin: string): s
   <channel>
     <title>${escapeXml(site.name)}</title>
     <link>${link(`/${BLOG}`)}</link>
-    <description>${escapeXml(site.description || `Neue Beiträge von ${site.name}`)}</description>
-    <language>de</language>
+    <description>${escapeXml(site.description || (site.language === "en" ? `New posts from ${site.name}` : `Neue Beiträge von ${site.name}`))}</description>
+    <language>${site.language ?? "de"}</language>
     <atom:link href="${link(`/${BLOG}/feed.xml`)}" rel="self" type="application/rss+xml" />
 ${items}
   </channel>
@@ -220,12 +222,12 @@ ${items}
 
 export function renderNotFound({ site, nav, legal = [], themeCss }: SiteContext): string {
   return html(
-    <Document title={`Seite nicht gefunden · ${site.name}`} themeCss={themeCss} head={<meta name="robots" content="noindex" />}>
+    <Document title={`${site.language === "en" ? "Page not found" : "Seite nicht gefunden"} · ${site.name}`} language={site.language} themeCss={themeCss} head={<meta name="robots" content="noindex" />}>
       <SiteFrame site={site} nav={nav} legal={legal} current="" linkTo={publicPath}>
-        <h1 className="t-heading t-heading-1">Seite nicht gefunden</h1>
+        <h1 className="t-heading t-heading-1">{site.language === "en" ? "Page not found" : "Seite nicht gefunden"}</h1>
         <div className="t-text">
           <p>
-            Diese Seite gibt es nicht (mehr). <a href="/">Zur Startseite</a>
+            {site.language === "en" ? <>This page could not be found. <a href="/">Back to home</a></> : <>Diese Seite gibt es nicht (mehr). <a href="/">Zur Startseite</a></>}
           </p>
         </div>
       </SiteFrame>

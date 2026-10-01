@@ -259,6 +259,9 @@ export function renderDashboard({ user, pages, site, media, origin, error }: Das
                 Kurzbeschreibung für Suchmaschinen
                 <textarea name="description" maxLength={300} rows={2} defaultValue={site.description} />
               </label>
+              <label>Sprache der Website
+                <select name="language" defaultValue={site.language ?? "de"}><option value="de">Deutsch</option><option value="en">Englisch</option></select>
+              </label>
               <fieldset className="a-logos">
                 <legend>Logo (erscheint oben statt des Namens und als Symbol im Browser-Tab)</legend>
                 <label className="a-logo-choice">

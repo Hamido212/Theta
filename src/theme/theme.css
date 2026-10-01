@@ -174,6 +174,8 @@ body {
   justify-content: space-between;
   gap: 0.5rem var(--t-space);
 }
+.t-feed-link { color: var(--t-color-muted); display: inline-flex; align-items: center; padding: .4rem; border: 1px solid color-mix(in srgb, var(--t-color-muted) 18%, transparent); border-radius: 6px; }
+.t-feed-link:hover { color: var(--t-color-accent); }
 
 .t-brand {
   font-family: var(--t-font-heading);
@@ -281,6 +283,46 @@ body {
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+/* Profile, project lists and dated entries are controlled block layouts. */
+.t-profile { display: grid; grid-template-columns: 128px minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+.t-profile:not(:has(> img)) { grid-template-columns: 1fr; }
+.t-profile > img { width: 128px; height: 128px; border-radius: 50%; object-fit: cover; }
+.t-profile-content { min-width: 0; }
+.t-profile-eyebrow { display: flex; flex-wrap: wrap; gap: .5rem; margin: 0 0 .7rem; font: .8rem ui-monospace, monospace; letter-spacing: .075em; text-transform: uppercase; }
+.t-profile-badge { padding: .2rem .45rem; border-radius: 4px; color: var(--t-color-muted); background: color-mix(in srgb, var(--t-color-muted) 8%, transparent); }
+.t-profile-badge:first-child { color: var(--t-color-accent); background: color-mix(in srgb, var(--t-color-accent) 10%, transparent); }
+.t-profile-title { font: 700 1.8rem/1.25 var(--t-font-heading); letter-spacing: -.025em; margin: 0 0 1rem; text-wrap: balance; }
+.t-highlight { color: var(--t-color-accent); font-weight: inherit; }
+.t-profile-text { font-size: 1rem; line-height: 1.7; color: color-mix(in srgb, var(--t-color-text) 80%, var(--t-color-bg)); }
+.t-profile-text p { margin: 0; }
+.t-social-links { display: flex; flex-wrap: wrap; gap: .85rem; margin: 1rem 0 1.3rem; }
+.t-social-links a, .t-social-links > span { color: var(--t-color-muted); display: inline-flex; }
+.t-social-links a:hover { color: var(--t-color-accent); }
+.t-list-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.3rem; }
+.t-list-heading h2 { font: 700 .8rem ui-monospace, monospace; text-transform: uppercase; letter-spacing: .12em; margin: 0; padding-left: .8rem; border-left: 2px solid var(--t-color-accent); }
+.t-list-all { font: .8rem ui-monospace, monospace; color: var(--t-color-accent); text-decoration: none; white-space: nowrap; }
+.t-list-items { display: flex; flex-direction: column; gap: .85rem; }
+.t-list-item { position: relative; min-width: 0; padding: 1.2rem 1.3rem; border: 1px solid color-mix(in srgb, var(--t-color-muted) 20%, transparent); border-radius: 10px; background: color-mix(in srgb, var(--t-color-bg) 97%, var(--t-color-text)); }
+.t-list-meta { margin: 0 0 .65rem; color: var(--t-color-muted); font: .8rem/1.5 ui-monospace, monospace; }
+.t-list-title { margin: 0 0 .45rem; padding-right: 1.5rem; font: 700 1.15rem/1.4 var(--t-font-heading); }
+.t-list-title a { color: inherit; text-decoration: none; }
+.t-list-title a::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
+.t-list-arrow { position: absolute; right: 1.3rem; top: 1.5rem; font-size: 1.2rem; color: var(--t-color-accent); opacity: .65; }
+.t-list-item:has(a:hover) { border-color: var(--t-color-accent); }
+.t-list-item .t-text { font-size: 1rem; line-height: 1.7; }
+.t-list-item .t-text a { position: relative; z-index: 1; }
+.t-tags { display: flex; flex-wrap: wrap; gap: .4rem; list-style: none; padding: 0; margin: .85rem 0 0; }
+.t-tags li { font: .75rem/1.5 ui-monospace, monospace; border-radius: 3px; padding: .12rem .4rem; color: var(--t-color-accent); background: color-mix(in srgb, var(--t-color-accent) 9%, transparent); }
+.t-list-timeline .t-list-items { margin-left: .4rem; padding-left: 1.5rem; border-left: 1px solid color-mix(in srgb, var(--t-color-muted) 25%, transparent); gap: 2.7rem; }
+.t-list-timeline .t-list-item { padding: 0; background: transparent; border: 0; border-radius: 0; }
+.t-list-timeline .t-list-item::before { content: ""; position: absolute; left: -1.85rem; top: .2rem; width: .65rem; height: .65rem; border-radius: 50%; background: var(--t-color-accent); outline: 5px solid var(--t-color-bg); }
+@media (max-width: 36rem) {
+  .t-profile { grid-template-columns: 1fr; gap: 1.2rem; }
+  .t-profile > img { width: 100px; height: 100px; }
+  .t-profile-title { font-size: 1.6rem; }
+  .t-list-item { padding: 1rem; }
 }
 
 .t-gallery img {

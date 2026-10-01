@@ -1,4 +1,5 @@
 import { ValidationError } from "../blocks";
+import { portfolioCss } from "./portfolio-css";
 
 // Themes are sets of design tokens. A site picks a preset and may adjust a few choices;
 // everything is turned into CSS custom properties, so no block ever carries its own style.
@@ -14,6 +15,7 @@ const CLASSIC = '"Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua
 const ROUNDED = 'ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", system-ui, sans-serif';
 
 export const WEB_FONTS = {
+  atkinson: { family: "Atkinson", weight: "400 700" },
   inter: { family: "Inter", weight: "100 900" },
   fraunces: { family: "Fraunces", weight: "100 900" },
   lora: { family: "Lora", weight: "400 700" },
@@ -35,6 +37,7 @@ type FontChoice = { label: string; heading: string; body: string; web: readonly 
 const stack = (font: WebFont, fallback: string) => `"${WEB_FONTS[font].family}", ${fallback}`;
 
 export const FONTS = {
+  atkinson: { label: "Atkinson: klar und gut lesbar", heading: stack("atkinson", SANS), body: stack("atkinson", SANS), web: ["atkinson"] },
   "serif-headings": { label: "Serifen-Überschriften", heading: SERIF, body: SANS, web: [] },
   system: { label: "Modern und schlicht", heading: SANS, body: SANS, web: [] },
   classic: { label: "Klassisch", heading: CLASSIC, body: CLASSIC, web: [] },
@@ -47,7 +50,7 @@ export const FONTS = {
 } satisfies Record<string, FontChoice>;
 
 // File names of a bundled font, relative to /assets/fonts/.
-export const fontFiles = (font: WebFont) => (Object.keys(SUBSETS) as (keyof typeof SUBSETS)[]).map((subset) => `${font}-${subset}.woff2`);
+export const fontFiles = (font: WebFont) => font === "atkinson" ? ["atkinson-regular.woff", "atkinson-bold.woff"] : (Object.keys(SUBSETS) as (keyof typeof SUBSETS)[]).map((subset) => `${font}-${subset}.woff2`);
 
 export const isFontFile = (name: string) => (Object.keys(WEB_FONTS) as WebFont[]).some((font) => fontFiles(font).includes(name));
 
@@ -55,7 +58,7 @@ export const isFontFile = (name: string) => (Object.keys(WEB_FONTS) as WebFont[]
 export function fontFaces(fonts: readonly WebFont[]): string {
   return fonts
     .flatMap((font) =>
-      (Object.entries(SUBSETS) as [keyof typeof SUBSETS, string][]).map(
+        font === "atkinson" ? [400, 700].map((weight) => `@font-face{font-family:"Atkinson";font-style:normal;font-display:swap;font-weight:${weight};src:url(/assets/fonts/atkinson-${weight === 400 ? "regular" : "bold"}.woff) format("woff")}`) : (Object.entries(SUBSETS) as [keyof typeof SUBSETS, string][]).map(
         ([subset, range]) =>
           `@font-face{font-family:"${WEB_FONTS[font].family}";font-style:normal;font-display:swap;font-weight:${WEB_FONTS[font].weight};src:url(/assets/fonts/${font}-${subset}.woff2) format("woff2");unicode-range:${range}}`,
       ),
@@ -91,6 +94,13 @@ type Preset = {
 };
 
 export const PRESETS = {
+  portfolio: {
+    label: "Portfolio",
+    description: "Kompaktes Profil, ruhige Projektkarten und gut lesbare Texte.",
+    light: { bg: "#fafafa", text: "#18181b", muted: "#62626a" },
+    dark: { bg: "#09090b", text: "#fafafa", muted: "#a1a1aa" },
+    defaults: { accent: "#4f46e5", fonts: "atkinson", spacing: "normal", radius: "soft", width: "wide", colorScheme: "auto" },
+  },
   klar: {
     label: "Klar",
     description: "Ruhig und hell, mit Serifen-Überschriften. Passt zu fast allem.",
@@ -173,10 +183,11 @@ export function themeCss(theme: ThemeSettings): string {
   const darkBands = bands(preset.dark, nightAccent, preset.light, lightAccent);
 
   const faces = fontFaces(fonts.web);
+  const presentation = theme.preset === "portfolio" ? portfolioCss : "";
 
-  if (theme.colorScheme === "light") return faces + root([...shared, ...light, "color-scheme: light"]) + lightBands;
-  if (theme.colorScheme === "dark") return faces + root([...shared, ...dark, "color-scheme: dark"]) + darkBands;
-  return `${faces}${root([...shared, ...light, "color-scheme: light dark"])}${lightBands}@media (prefers-color-scheme: dark){${root(dark)}${darkBands}}`;
+  if (theme.colorScheme === "light") return faces + root([...shared, ...light, "color-scheme: light"]) + lightBands + presentation;
+  if (theme.colorScheme === "dark") return faces + root([...shared, ...dark, "color-scheme: dark"]) + darkBands + presentation;
+  return `${faces}${root([...shared, ...light, "color-scheme: light dark"])}${lightBands}@media (prefers-color-scheme: dark){${root(dark)}${darkBands}}${presentation}`;
 }
 
 function colors(palette: Palette, accent: string): string[] {
